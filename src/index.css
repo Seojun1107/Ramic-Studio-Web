@@ -4,3 +4,14 @@
   padding: 0;
   box-sizing: border-box;
 }
+:root {
+  width: 100vw;
+  height: 100vh;
+}
+
+.noneDrag {
+  -webkit-user-select:none;
+  -moz-user-select:none;
+  -ms-user-select:none;
+  user-select:none;
+}
