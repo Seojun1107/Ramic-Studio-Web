@@ -2,37 +2,46 @@
 import React from 'react';
 import styled from 'styled-components';
 import { useNavigate } from "react-router-dom";
+import { newsList } from '../data/mockData'; // 가상 데이터 가져오기
 
 const NewsSection = () => {
-    let navigate = useNavigate();
+    const navigate = useNavigate();
+
+    const handleNewsClick = (url) => {
+        if (url) {
+            navigate(url); // 동적으로 라우팅
+        }
+    };
+
     return (
         <PostWrap>
-        <Title>📢 소식</Title>
-        <ContentArea>
-            <MainCard>
-            <MainImage src="https://via.placeholder.com/640x360" alt="main" />
-            <MainContent>
-                <Tag>소식</Tag>
-                <MainTitle>우주하마님께서 이번에 저희 플레져가든에서 출시된 게임,<br/> Snowscape를 플레이해주셨습니다!
-                </MainTitle>
-                <Date>2025.04.13</Date>
-            </MainContent>
-            </MainCard>
+            <Title>📢 소식</Title>
+            <ContentArea>
+                <MainCard onClick={() => handleNewsClick(newsList[0].url)}>
+                    <MainImage src="https://via.placeholder.com/640x360" alt="main" />
+                    <MainContent>
+                        <Tag>소식</Tag>
+                        <MainTitle>
+                            우주하마님께서 이번에 저희 플레져가든에서 출시된 게임,<br /> Snowscape를 플레이해주셨습니다!
+                        </MainTitle>
+                        <Date>2025.04.13</Date>
+                    </MainContent>
+                </MainCard>
 
-            <SideList>
-            {[1, 2, 3, 4].map((_, i) => (
-                <SideCard key={i}>
-                <SideText>
-                    <small>소식</small>
-                    <span>{i + 1}번째 뉴스 제목입니다</span>
-                </SideText>
-                <SideThumb src="https://via.placeholder.com/100x60" />
-                </SideCard>
-            ))}
-            </SideList>
-        </ContentArea>
+                <SideList>
+                    {newsList.map((news) => (
+                        <SideCard key={news.id} onClick={() => handleNewsClick(news.url)}>
+                            <SideText>
+                                <small>{news.type}</small>
+                                <span>{news.title}</span>
+                            </SideText>
+                            <SideThumb src="https://via.placeholder.com/100x60" />
+                        </SideCard>
+                    ))}
+                </SideList>
+            </ContentArea>
 
-        <SeeAllBtn onClick={() => {navigate("/news")}}>모두 보기</SeeAllBtn>
+            <SeeAllBtn onClick={() => navigate("/news")}>모두 보기</SeeAllBtn>
         </PostWrap>
     );
 };
@@ -80,6 +89,7 @@ const MainCard = styled.div`
   background: rgba(255, 255, 255, 0.05);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   transition: all 0.3s ease;
+  cursor: pointer; /* 클릭 가능하도록 커서 변경 */
 
   &:hover {
     transform: scale(1.015);
@@ -144,6 +154,7 @@ const SideCard = styled.div`
   backdrop-filter: blur(6px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   transition: all 0.25s ease;
+  cursor: pointer; /* 클릭 가능하도록 커서 변경 */
 
   &:hover {
     background: rgba(255, 255, 255, 0.08);
