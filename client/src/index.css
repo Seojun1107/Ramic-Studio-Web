@@ -65,3 +65,67 @@ body,.studio-site{background:var(--ink);color:var(--paper)}
 
 /* Keep the visual language neutral across all sections. */
 .hero-art:after{background:radial-gradient(circle,#f1efe6 0 1%,#77766f 9%,transparent 54%);opacity:.22}
+
+
+/* Responsive / contrast hardening */
+.noise{inset:0;width:100%;height:100%;}
+/* Light monochrome surfaces must always use ink text. */
+.signal-strip,.signal-strip strong,.signal-strip a,.signal-strip div{color:var(--ink)}
+.manifesto,.manifesto h2,.manifesto h2 span,.manifesto .eyebrow,.manifesto-copy,.manifesto .text-link,.manifesto-stamp{color:var(--ink)}
+.manifesto .text-link{border-color:var(--ink)}
+.feature-title{left:20px;bottom:20px;padding:14px 16px;background:linear-gradient(90deg,#08090df2 0%,#08090dcc 70%,transparent 100%);text-shadow:0 1px 10px #000}
+.feature-title h3,.feature-title p{color:#f4f2ea}
+.feature-code,.feature-status{padding:6px 8px;background:#08090dcc;text-shadow:0 1px 8px #000}
+.site-footer{min-height:0}
+
+@media(max-width:800px){
+  .hero{min-height:720px;height:auto;max-height:none;padding-bottom:116px}
+  .hero-meta{right:22px;gap:10px;font-size:9px}
+  .hero-bottom{bottom:24px;gap:10px;font-size:9px}
+  .hero-bottom .scroll-label{max-width:150px}
+  .game-feature-image{min-height:390px}
+  .feature-title{left:14px;right:14px;bottom:14px;padding:12px 13px}
+  .feature-title h3{font-size:clamp(25px,8vw,38px)}
+  .feature-title p{font-size:11px}
+  .site-footer{align-items:flex-start;padding-top:26px;padding-bottom:28px;gap:14px}
+  .footer-links{width:100%;margin-left:0;flex-wrap:wrap;gap:10px 16px}
+  .footer-copy{order:3;width:100%;line-height:1.5}
+
+  /* Keep every admin section reachable on narrow screens. */
+  .admin-sidebar{display:flex;flex-wrap:wrap;align-items:center;gap:16px 12px;padding:18px 16px}
+  .admin-sidebar .brand{flex:1 1 auto;min-width:0}
+  .admin-sidebar .brand img{width:min(142px,42vw)}
+  .admin-sidebar .admin-logout,.admin-sidebar .back-link:last-child{margin:0;white-space:nowrap}
+  .admin-nav{display:flex;order:3;width:100%;flex-direction:row;gap:6px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none}
+  .admin-nav::-webkit-scrollbar{display:none}
+  .admin-nav button{flex:0 0 auto;padding:10px 11px;font-size:10px;white-space:nowrap}
+  .admin-main{padding:34px 16px 48px}
+  .admin-top{gap:14px}
+  .admin-top h1{font-size:clamp(28px,9vw,44px)}
+  .admin-user{display:flex;flex:0 0 auto;align-items:flex-end;gap:5px;font-size:8px;line-height:1.2}
+  .admin-user button{margin-top:2px}
+  .admin-stats{margin:30px 0 24px}
+  .admin-stats div{padding:14px 9px}
+  .admin-stats span{font-size:8px;line-height:1.35;min-height:22px}
+  .admin-stats strong{font-size:20px}
+  .admin-panel-grid{gap:10px}
+  .admin-panel-grid button{min-height:140px;padding:18px}
+  .content-head{gap:14px}
+  .content-head>button{width:100%;justify-content:center}
+  .notice-editor{padding:18px 15px}
+  .editor-grid,.link-group{grid-template-columns:minmax(0,1fr)}
+  .upload-row{display:grid;grid-template-columns:minmax(0,1fr)}
+  .upload-button{width:100%}
+  .cms-item{padding:15px}
+}
+
+@media(max-width:420px){
+  .main-nav{left:10px;right:10px}
+  .hero h1{font-size:clamp(38px,12vw,54px)}
+  .section{padding-left:16px;padding-right:16px}
+  .section-heading h2{font-size:clamp(38px,12vw,56px)}
+  .manifesto{padding-left:16px;padding-right:16px}
+  .manifesto-stamp{right:3%;bottom:7%;transform:scale(.68) rotate(12deg)}
+  .admin-sidebar .back-link{font-size:0}
+  .admin-sidebar .back-link svg{margin:0}
+}
