@@ -37,7 +37,14 @@ const emptyGame = {
   isNew: false,
   previewUrl: "",
 };
-const emptyNotice = { category: "STUDIO", title: "", body: "" };
+const emptyNotice = {
+  category: "STUDIO",
+  title: "",
+  body: "",
+  discordNotify: false,
+  discordMentionEveryone: false,
+  discordBody: "",
+};
 const emptyMember = {
   name: "",
   role: "",
@@ -356,6 +363,10 @@ export default function Admin() {
   const [authorized, setAuthorized] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
   const [notice, setNotice] = useState(emptyNotice);
+  const [noticeFeedback, setNoticeFeedback] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
   const [editingNotice, setEditingNotice] = useState<string | null>(null);
   const [game, setGame] = useState(emptyGame);
   const [editingGame, setEditingGame] = useState<string | null>(null);
@@ -449,7 +460,7 @@ export default function Admin() {
     void check();
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("focus", onVisibility);
-    const timer = deployWatch ? window.setInterval(check, 3000) : undefined;
+    const timer = window.setInterval(check, deployWatch ? 3000 : 10000);
     return () => {
       active = false;
       if (timer) window.clearInterval(timer);
@@ -458,17 +469,29 @@ export default function Admin() {
     };
   }, [authorized, deployWatch, deployBaseSha]);
   const publish = trpc.news.publish.useMutation({
-    onSuccess: () => {
+    onSuccess: result => {
       setNotice(emptyNotice);
+      setNoticeFeedback({
+        tone: result.discord.sent ? "success" : "success",
+        message: result.discord.message,
+      });
       void utils.admin.notices.invalidate();
     },
+    onError: error =>
+      setNoticeFeedback({ tone: "error", message: `공지 발행 실패: ${error.message}` }),
   });
   const updateNotice = trpc.news.update.useMutation({
-    onSuccess: () => {
+    onSuccess: result => {
       setNotice(emptyNotice);
       setEditingNotice(null);
+      setNoticeFeedback({
+        tone: result.discord.sent ? "success" : "success",
+        message: result.discord.message,
+      });
       void utils.admin.notices.invalidate();
     },
+    onError: error =>
+      setNoticeFeedback({ tone: "error", message: `공지 수정 실패: ${error.message}` }),
   });
   const removeNotice = trpc.news.remove.useMutation({
     onSuccess: () => void utils.admin.notices.invalidate(),
@@ -567,7 +590,12 @@ export default function Admin() {
         credentials: "include",
         cache: "no-store",
       });
-      if (r.ok) setDeploy(await r.json());
+      if (r.ok) {
+        const next = await r.json();
+        setDeploy(next);
+        if (!next.accepted && next.message)
+          setNoticeFeedback({ tone: "error", message: next.message });
+      }
     } catch {
       setDeploy((current: any) => ({
         ...(current ?? {}),
@@ -738,6 +766,9 @@ export default function Admin() {
                               category: item.category,
                               title: item.title,
                               body: item.body,
+                              discordNotify: false,
+                              discordMentionEveryone: false,
+                              discordBody: "",
                             });
                             window.scrollTo({ top: 0, behavior: "smooth" });
                           }}
@@ -786,6 +817,22 @@ export default function Admin() {
                 <code>동영상 → 업로드 후 ![video](자동 생성 경로)</code>
                 <code>**강조** · [링크 이름](https://...)</code>
               </div>
+              {noticeFeedback && (
+                <div
+                  className={`notice-feedback notice-feedback-${noticeFeedback.tone}`}
+                  role={noticeFeedback.tone === "error" ? "alert" : "status"}
+                  aria-live="polite"
+                >
+                  {noticeFeedback.message}
+                  <button
+                    type="button"
+                    aria-label="알림 닫기"
+                    onClick={() => setNoticeFeedback(null)}
+                  >
+                    닫기
+                  </button>
+                </div>
+              )}
               <form
                 onSubmit={e => {
                   e.preventDefault();
@@ -832,6 +879,47 @@ export default function Admin() {
                     placeholder="## 업데이트 소식\n\n본문에 들어갈 내용을 작성하세요."
                   />
                 </label>
+                <fieldset className="discord-options">
+                  <legend>DISCORD 공지 옵션</legend>
+                  <label className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={notice.discordNotify}
+                      onChange={e =>
+                        setNotice({ ...notice, discordNotify: e.target.checked })
+                      }
+                    />
+                    Discord에도 같은 공지를 전송
+                  </label>
+                  {notice.discordNotify && (
+                    <>
+                      <label className="check-row">
+                        <input
+                          type="checkbox"
+                          checked={notice.discordMentionEveryone}
+                          onChange={e =>
+                            setNotice({
+                              ...notice,
+                              discordMentionEveryone: e.target.checked,
+                            })
+                          }
+                        />
+                        맨 위에 @everyone 추가
+                      </label>
+                      <label>
+                        Discord용 공지 문구 (선택)
+                        <textarea
+                          rows={6}
+                          value={notice.discordBody}
+                          onChange={e =>
+                            setNotice({ ...notice, discordBody: e.target.value })
+                          }
+                          placeholder="비워두면 웹 공지의 제목과 본문을 그대로 전송합니다."
+                        />
+                      </label>
+                    </>
+                  )}
+                </fieldset>
                 <button className="publish-button">
                   {editingNotice ? <Pencil size={16} /> : <Plus size={16} />}{" "}
                   {editingNotice ? "공지사항 수정" : "공지사항 발행"}

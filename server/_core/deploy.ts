@@ -27,7 +27,9 @@ let status: DeployStatus = {
   state: "idle",
   currentSha: "",
   remoteSha: "",
-  message: "배포 대기 중",
+  message: process.env.GITHUB_WEBHOOK_SECRET
+    ? "GitHub 웹훅으로 새 커밋을 기다리는 중입니다."
+    : "GitHub 웹훅이 설정되지 않았습니다.",
 };
 let running = false;
 
@@ -104,7 +106,16 @@ export function receiveGitHubPush(payload: unknown) {
 
 export async function getDeployStatus() {
   const currentSha = await localSha();
-  status = { ...status, currentSha };
+  status = {
+    ...status,
+    currentSha,
+    message:
+      status.remoteSha || status.state !== "idle"
+        ? status.message
+        : process.env.GITHUB_WEBHOOK_SECRET
+          ? "GitHub 웹훅으로 새 커밋을 기다리는 중입니다."
+          : "GitHub 웹훅이 설정되지 않았습니다.",
+  };
   return {
     ...status,
     hasUpdate: Boolean(
@@ -125,23 +136,29 @@ export async function startDeployment() {
       accepted: false,
       message: "이미 업데이트가 진행 중입니다.",
     };
+  const targetSha = status.remoteSha;
+  if (!targetSha)
+    return {
+      ...status,
+      accepted: false,
+      message: "아직 웹훅으로 받은 새 커밋이 없습니다.",
+    };
   running = true;
   status = {
     state: "updating",
     currentSha: await localSha(),
-    remoteSha: "",
+    remoteSha: targetSha,
     message: "서버 업데이트를 시작했습니다.",
     startedAt: new Date().toISOString(),
   };
-  void runDeployment();
+  void runDeployment(targetSha);
   return { ...status, accepted: true };
 }
 
-async function runDeployment() {
+async function runDeployment(targetSha: string) {
   const backupRef = await localSha();
   try {
-    const remote = status.remoteSha;
-    if (!remote) throw new Error("GitHub 웹훅으로 받은 커밋이 없습니다.");
+    const remote = targetSha;
     status = {
       ...status,
       message: "웹훅으로 받은 커밋을 동기화합니다.",

@@ -24,6 +24,7 @@ import {
   updateTeam,
 } from "./db";
 import { hash } from "bcryptjs";
+import { publishDiscordNotice } from "./_core/discord";
 const gameInput = z.object({
   code: z.string().min(1).max(20),
   title: z.string().min(1).max(120),
@@ -36,6 +37,16 @@ const gameInput = z.object({
   externalLabel: z.string().max(40).nullable().optional(),
   isNew: z.boolean().default(false),
   previewUrl: z.string().max(2000).nullable().optional(),
+});
+const noticeInput = z.object({
+  category: z.string().min(1).max(40),
+  title: z.string().min(3).max(255),
+  body: z.string().min(3).max(100000),
+  coverUrl: z.string().max(2000).nullable().optional(),
+  publishedAt: z.date().optional(),
+  discordNotify: z.boolean().default(false),
+  discordMentionEveryone: z.boolean().default(false),
+  discordBody: z.string().max(100000).optional(),
 });
 export const appRouter = router({
   system: systemRouter,
@@ -59,31 +70,55 @@ export const appRouter = router({
     detail: publicProcedure
       .input(z.object({ id: z.string() }))
       .query(({ input }) => getNotice(input.id)),
-    publish: adminProcedure
-      .input(
-        z.object({
-          category: z.string().min(1).max(40),
-          title: z.string().min(3).max(255),
-          body: z.string().min(3).max(100000),
-          coverUrl: z.string().max(2000).nullable().optional(),
-          publishedAt: z.date().optional(),
-        })
-      )
-      .mutation(({ input }) =>
-        createNotice({ ...input, publishedAt: input.publishedAt ?? new Date() })
-      ),
+    publish: adminProcedure.input(noticeInput).mutation(async ({ input }) => {
+      const { discordNotify, discordMentionEveryone, discordBody, ...notice } = input;
+      const created = await createNotice({
+        ...notice,
+        publishedAt: notice.publishedAt ?? new Date(),
+      });
+      if (!created)
+        return {
+          notice: null,
+          discord: { sent: false, message: "공지 저장에 실패했습니다." },
+        };
+      const discord = discordNotify
+        ? await publishDiscordNotice({
+            title: created.title,
+            body: created.body,
+            mentionEveryone: discordMentionEveryone,
+            customBody: discordBody,
+          })
+        : {
+            sent: false as const,
+            skipped: true as const,
+            message: "Discord 전송을 건너뛰었습니다.",
+          };
+      return { notice: created, discord };
+    }),
     update: adminProcedure
-      .input(
-        z.object({
-          id: z.string(),
-          category: z.string().min(1).max(40),
-          title: z.string().min(3).max(255),
-          body: z.string().min(3).max(100000),
-          coverUrl: z.string().max(2000).nullable().optional(),
-          publishedAt: z.date().optional(),
-        })
-      )
-      .mutation(({ input }) => updateNotice(input.id, input)),
+      .input(noticeInput.extend({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        const { id, discordNotify, discordMentionEveryone, discordBody, ...notice } = input;
+        const updated = await updateNotice(id, notice);
+        if (!updated)
+          return {
+            notice: null,
+            discord: { sent: false, message: "공지 수정에 실패했습니다." },
+          };
+        const discord = discordNotify
+          ? await publishDiscordNotice({
+              title: updated.title,
+              body: updated.body,
+              mentionEveryone: discordMentionEveryone,
+              customBody: discordBody,
+            })
+          : {
+              sent: false as const,
+              skipped: true as const,
+              message: "Discord 전송을 건너뛰었습니다.",
+            };
+        return { notice: updated, discord };
+      }),
     remove: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(({ input }) => deleteNotice(input.id)),

@@ -129,3 +129,15 @@ body,.studio-site{background:var(--ink);color:var(--paper)}
   .admin-sidebar .back-link{font-size:0}
   .admin-sidebar .back-link svg{margin:0}
 }
+
+
+/* Notice publishing feedback and Discord delivery controls */
+.discord-options{margin:24px 0;border:1px solid var(--line);padding:18px;background:#111110}
+.discord-options legend{padding:0 8px;color:var(--paper);font:10px var(--mono);letter-spacing:.08em}
+.discord-options .check-row{margin:12px 0;color:var(--paper);font:12px var(--sans)}
+.discord-options .check-row input{accent-color:var(--paper)}
+.discord-options label:not(.check-row){margin-top:18px}
+.notice-feedback{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:18px 0;padding:14px 16px;border:1px solid var(--paper);background:#1c1c1a;color:var(--paper);font:11px/1.5 var(--mono)}
+.notice-feedback-error{border-color:var(--coral);color:#f0eee8}
+.notice-feedback button{border:1px solid currentColor;background:transparent;color:inherit;padding:6px 9px;font:10px var(--mono);cursor:pointer;white-space:nowrap}
+@media(max-width:520px){.notice-feedback{align-items:flex-start;flex-direction:column}.notice-feedback button{width:100%}.discord-options{padding:15px 12px}}
