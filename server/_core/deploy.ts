@@ -32,6 +32,18 @@ async function command(file: string, args: string[], timeout = 120_000) {
   });
 }
 
+async function packageManager(args: string[], timeout = 300_000) {
+  try {
+    return await command("pnpm", args, timeout);
+  } catch (firstError) {
+    try {
+      return await command("corepack", ["pnpm", ...args], timeout);
+    } catch {
+      throw firstError;
+    }
+  }
+}
+
 async function localSha() {
   try {
     return (await command("git", ["rev-parse", "HEAD"], 15_000)).stdout.trim();
@@ -76,11 +88,11 @@ async function runDeployment() {
     if (fetched !== remote) throw new Error("GitHub 커밋이 동기화 중 변경되었습니다. 다시 시도해 주세요.");
     await command("git", ["reset", "--hard", `origin/${branch}`]);
     status = { ...status, message: "소스 동기화 완료. 의존성을 설치합니다." };
-    if (await fileExists("pnpm-lock.yaml")) await command("pnpm", ["install", "--frozen-lockfile", "--force"], 300_000);
+    if (await fileExists("pnpm-lock.yaml")) await packageManager(["install", "--frozen-lockfile", "--force"]);
     else if (await fileExists("package-lock.json")) await command("npm", ["ci"], 300_000);
     else await command("npm", ["install"], 300_000);
     status = { ...status, message: "의존성 설치 완료. 프론트엔드와 백엔드를 빌드합니다." };
-    await command("pnpm", ["build"], 300_000).catch(async () => command("npm", ["run", "build"], 300_000));
+    await packageManager(["build"]).catch(async () => command("npm", ["run", "build"], 300_000));
     status = { ...status, message: "빌드 완료. 서비스를 재시작합니다." };
     await command("pm2", ["restart", pm2Name, "--update-env"], 60_000);
     status = { state: "success", currentSha: fetched, remoteSha: fetched, message: "업데이트와 서비스 재시작이 완료되었습니다.", startedAt: status.startedAt, finishedAt: new Date().toISOString() };
