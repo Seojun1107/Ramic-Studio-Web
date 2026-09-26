@@ -46,3 +46,6 @@ html{scrollbar-gutter:stable;scrollbar-color:var(--lime) #11131a;scrollbar-width
 
 /* One representative image per game: never tile uploaded artwork */
 .game-feature-image-bg{background-repeat:no-repeat;background-position:center;background-size:cover;background-color:#11131a}
+
+.game-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.game-action{display:inline-flex;align-items:center;gap:7px;padding:10px 12px;border:1px solid #687078;background:#08090daa;color:var(--paper);font:10px var(--mono);transition:color .2s,border-color .2s,background .2s}.game-action:hover{color:var(--ink);border-color:var(--lime);background:var(--lime)}.game-action-preview{border-color:var(--coral);color:var(--coral)}.game-action-preview:hover{background:var(--coral);color:var(--ink)}.play-button-disabled{opacity:.35;cursor:not-allowed;pointer-events:none}.play-button{z-index:4}
+@media(max-width:800px){.game-actions{max-width:calc(100% - 10px)}.game-action{font-size:9px;padding:9px 10px}}

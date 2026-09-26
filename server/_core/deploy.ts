@@ -55,10 +55,12 @@ async function localSha() {
 
 async function remoteSha(force = false) {
   if (!force && remoteCache.sha && remoteCache.expiresAt > Date.now()) return remoteCache.sha;
-  const response = await fetch(`https://api.github.com/repos/${repo}/commits/${encodeURIComponent(branch)}`, {
-    cache: "no-store",
-    headers: { Accept: "application/vnd.github+json", "Cache-Control": "no-cache", ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) },
-  });
+  try {
+    const output = await command("git", ["ls-remote", "origin", `refs/heads/${branch}`], 30_000);
+    const sha = output.stdout.trim().split(/\s+/)[0];
+    if (sha) { remoteCache = { sha, expiresAt: Date.now() + 8_000 }; return sha; }
+  } catch { /* fall through to the API when git cannot reach origin */ }
+  const response = await fetch(`https://api.github.com/repos/${repo}/commits/${encodeURIComponent(branch)}`, { cache: "no-store", headers: { Accept: "application/vnd.github+json", "Cache-Control": "no-cache", ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) } });
   if (!response.ok) throw new Error(`GitHub 커밋 조회 실패 (${response.status})`);
   const data = (await response.json()) as { sha?: string };
   if (!data.sha) throw new Error("GitHub 응답에 커밋 SHA가 없습니다.");
