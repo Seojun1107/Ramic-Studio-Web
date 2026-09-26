@@ -41,6 +41,12 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  const activePublicRoot = process.env.NODE_ENV === "production" ? path.resolve(process.cwd(), "dist/public") : path.resolve(process.cwd(), "client/public");
+  const legacyPublicRoot = path.resolve(process.cwd(), "client/public");
+  const uploadRoot = path.join(activePublicRoot, "uploads");
+  // Keep previously uploaded files readable while new deployments write to the directory served by Express.
+  app.use("/uploads", express.static(uploadRoot, { fallthrough: true }));
+  if (legacyPublicRoot !== activePublicRoot) app.use("/uploads", express.static(path.join(legacyPublicRoot, "uploads"), { fallthrough: true }));
   // Preview ZIPs use a binary upload route below; JSON only needs to cover ordinary CMS media.
   app.use(express.json({ limit: "80mb" }));
   app.use(express.urlencoded({ limit: "80mb", extended: true }));
@@ -65,7 +71,7 @@ async function startServer() {
     const allowed = /^(image\/(jpeg|png|gif|webp|svg\+xml)|video\/(mp4|webm|quicktime))$/i.test(mimeType);
     if (!allowed || !dataUrl.startsWith(`data:${mimeType};base64,`) || dataUrl.length > 70_000_000) { res.status(400).json({ message: "지원하지 않는 미디어 형식이거나 파일이 너무 큽니다. (최대 50MB)" }); return; }
     const extension = mimeType.split("/")[1].replace("svg+xml", "svg").replace("quicktime", "mov");
-    const targetDir = path.resolve(process.cwd(), "client/public/uploads/media"); const fileName = `${randomUUID()}.${extension}`; const target = path.join(targetDir, fileName);
+    const targetDir = path.join(uploadRoot, "media"); const fileName = `${randomUUID()}.${extension}`; const target = path.join(targetDir, fileName);
     try { await fs.mkdir(targetDir, { recursive: true }); await fs.writeFile(target, Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64")); res.json({ url: `/uploads/media/${fileName}` }); }
     catch { res.status(500).json({ message: "미디어를 저장할 수 없습니다." }); }
   });
@@ -75,7 +81,7 @@ async function startServer() {
     const body = req.body as Buffer | { zipBase64?: string } | undefined;
     const archive = Buffer.isBuffer(body) ? body : typeof body?.zipBase64 === "string" ? Buffer.from(body.zipBase64.replace(/^data:application\/zip;base64,/, ""), "base64") : null;
     if (!archive?.byteLength || archive.byteLength > 500 * 1024 * 1024) { res.status(400).json({ message: "ZIP 파일은 500MB 이하만 업로드할 수 있습니다." }); return; }
-    const temp = path.join(os.tmpdir(), `ramic-${randomUUID()}.zip`); const slug = randomUUID(); const target = path.resolve(process.cwd(), "client/public/uploads/previews", slug);
+    const temp = path.join(os.tmpdir(), `ramic-${randomUUID()}.zip`); const slug = randomUUID(); const target = path.join(uploadRoot, "previews", slug);
     try {
       await fs.mkdir(target, { recursive: true }); await fs.writeFile(temp, archive);
       const listing = (await execFileAsync("unzip", ["-Z1", temp], { maxBuffer: 12 * 1024 * 1024, timeout: 120_000 })).stdout.split(/\r?\n/).map(name => name.trim()).filter(Boolean);
