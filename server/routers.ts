@@ -3,23 +3,12 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, publicProcedure, router } from "./_core/trpc";
-import { createNotice, listNotices } from "./db";
-
-const fallbackNotices = [
-  { id: "fallback-1", category: "STUDIO", title: "라믹 스튜디오가 새로운 세계를 만들기 시작했습니다.", body: "게임을 제품이 아닌 장소처럼 느끼게 만드는 일에 대한 팀의 이야기입니다.", publishedAt: new Date("2026-09-18") },
-  { id: "fallback-2", category: "NEON VEIL", title: "첫 번째 신호를 공개합니다.", body: "우리가 만들고 있는 다음 세계의 조각을 지금 확인해보세요.", publishedAt: new Date("2026-08-29") },
-  { id: "fallback-3", category: "CAREERS", title: "함께 미지의 세계를 만들 동료를 찾습니다.", body: "아티스트, 디자이너, 엔지니어, 프로듀서를 기다립니다.", publishedAt: new Date("2026-07-11") },
-];
-
-export const appRouter = router({
-  system: systemRouter,
-  auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => { const cookieOptions = getSessionCookieOptions(ctx.req); ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 }); return { success: true } as const; }),
-  }),
-  news: router({
-    list: publicProcedure.query(async () => { const rows = await listNotices(); return rows.length ? rows : fallbackNotices; }),
-    publish: adminProcedure.input(z.object({ category: z.enum(["STUDIO", "NEON VEIL", "CAREERS", "COMMUNITY"]), title: z.string().min(3).max(255), body: z.string().min(3), publishedAt: z.date().optional() })).mutation(({ input }) => createNotice({ ...input, publishedAt: input.publishedAt ?? new Date() })),
-  }),
-});
+import { addAdmin, changeAdminPassword, createGame, createNotice, createTeam, getNotice, getSettings, listGames, listNotices, listTeam, saveSettings } from "./db";
+import { hash } from "bcryptjs";
+const fallbackNotices = [{ id: "fallback-1", category: "STUDIO", title: "라믹 스튜디오가 새로운 세계를 만들기 시작했습니다.", body: "게임을 제품이 아닌 장소처럼 느끼게 만드는 일에 대한 팀의 이야기입니다.", publishedAt: new Date("2026-09-18") }, { id: "fallback-2", category: "PROJECT", title: "첫 번째 신호를 공개합니다.", body: "우리가 만들고 있는 다음 세계의 조각을 지금 확인해보세요.", publishedAt: new Date("2026-08-29") }];
+const gameInput = z.object({ code: z.string().min(1).max(20), title: z.string().min(1).max(120), description: z.string().max(2000).default(""), genre: z.string().max(120).default(""), status: z.string().max(80).default("개발 중"), imageUrl: z.string().max(2000).default(""), videoUrl: z.string().max(2000).nullable().optional(), externalUrl: z.string().url().max(2000).nullable().optional(), externalLabel: z.string().max(40).nullable().optional(), isNew: z.boolean().default(false), previewUrl: z.string().max(2000).nullable().optional() });
+export const appRouter = router({ system: systemRouter, auth: router({ me: publicProcedure.query(opts => opts.ctx.user), logout: publicProcedure.mutation(({ ctx }) => { ctx.res.clearCookie(COOKIE_NAME, { ...getSessionCookieOptions(ctx.req), maxAge: -1 }); return { success: true } as const; }) }),
+  site: router({ settings: publicProcedure.query(() => getSettings()), games: publicProcedure.query(async () => listGames()), team: publicProcedure.query(async () => listTeam()) }),
+  news: router({ list: publicProcedure.query(async () => { const rows = await listNotices(); return rows.length ? rows : fallbackNotices; }), detail: publicProcedure.input(z.object({ id: z.string() })).query(({ input }) => getNotice(input.id)), publish: adminProcedure.input(z.object({ category: z.string().min(1).max(40), title: z.string().min(3).max(255), body: z.string().min(3).max(100000), coverUrl: z.string().max(2000).nullable().optional(), publishedAt: z.date().optional() })).mutation(({ input }) => createNotice({ ...input, publishedAt: input.publishedAt ?? new Date() })) }),
+  admin: router({ createGame: adminProcedure.input(gameInput).mutation(({ input }) => createGame(input)), createTeam: adminProcedure.input(z.object({ name: z.string().min(1).max(120), role: z.string().min(1).max(120), bio: z.string().max(2000).default(""), imageUrl: z.string().max(2000).nullable().optional(), sortOrder: z.number().int().min(0).default(0), isPublic: z.boolean().default(true) })).mutation(({ input }) => createTeam(input)), saveSettings: adminProcedure.input(z.object({ logoUrl: z.string().max(2000).optional(), instagramUrl: z.string().max(2000).optional(), youtubeUrl: z.string().max(2000).optional(), discordUrl: z.string().max(2000).optional(), steamUrl: z.string().max(2000).optional(), footerText: z.string().max(500).optional() })).mutation(({ input }) => saveSettings(input)), addAdmin: adminProcedure.input(z.object({ username: z.string().min(3).max(60).regex(/^[a-zA-Z0-9._-]+$/), password: z.string().min(12).max(200), name: z.string().min(1).max(120) })).mutation(async ({ input }) => { await addAdmin(input.username, await hash(input.password, 12), input.name); return { success: true }; }), changePassword: adminProcedure.input(z.object({ password: z.string().min(12).max(200) })).mutation(async ({ ctx, input }) => { if (!ctx.user) throw new Error("관리자 인증이 필요합니다."); await changeAdminPassword((ctx.user as any).openId.replace(/^admin:/, ""), await hash(input.password, 12)); return { success: true }; }) }) });
 export type AppRouter = typeof appRouter;
