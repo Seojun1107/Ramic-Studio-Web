@@ -1,0 +1,13 @@
+import { ArrowLeft, Check, LayoutDashboard, Plus, Send } from "lucide-react";
+import { Link } from "wouter";
+import { useState } from "react";
+import { trpc } from "@/lib/trpc";
+
+export default function Admin() {
+  const [published, setPublished] = useState(false);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const publish = trpc.news.publish.useMutation({ onSuccess: () => { setPublished(true); setTitle(""); setBody(""); } });
+  const submit = () => publish.mutate({ category: "STUDIO", title: title || "A new Ramic signal.", body: body || "More from the studio soon." });
+  return <div className="admin-shell"><aside className="admin-sidebar"><Link className="brand" href="/"><span className="brand-mark">R</span><span>RAMIC<br /><small>STUDIO</small></span></Link><div className="admin-nav"><span className="active"><LayoutDashboard size={15} /> Overview</span><span><Send size={15} /> Notices</span></div><Link className="back-link" href="/"><ArrowLeft size={14} /> Exit panel</Link></aside><main className="admin-main"><div className="admin-top"><div><p className="eyebrow">CONTROL ROOM / 01</p><h1>Good morning,<br /><em>creator.</em></h1></div><div className="admin-user">OWNER ACCESS<br /><strong>RAMIC STUDIO</strong></div></div><div className="admin-stats"><div><span>LIVE NOTICES</span><strong>04</strong></div><div><span>VISITORS / 30D</span><strong>12.8K</strong></div><div><span>LAST PUBLISHED</span><strong>2d ago</strong></div></div><section className="notice-editor"><div className="editor-head"><div><p className="eyebrow">PUBLISH A SIGNAL</p><h2>New notice</h2></div><span className="draft-badge">{published ? "LIVE" : "DRAFT"}</span></div><label>Title<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Write a clear, curious headline..." /></label><div className="editor-grid"><label>Category<select defaultValue="STUDIO"><option>STUDIO</option><option>NEON VEIL</option><option>CAREERS</option><option>COMMUNITY</option></select></label><label>Publish date<input type="date" defaultValue="2026-09-26" /></label></div><label>Body<textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Tell the story behind the signal..." rows={5} /></label><button className="publish-button" onClick={submit} disabled={publish.isPending}>{published ? <><Check size={16} /> Published to newsroom</> : <><Plus size={16} /> {publish.isPending ? "Publishing..." : "Publish notice"}</>}</button>{publish.error && <p className="form-error">Owner sign-in is required to publish a notice.</p>}</section></main></div>;
+}
