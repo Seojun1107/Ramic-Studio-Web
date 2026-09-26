@@ -449,10 +449,10 @@ export default function Admin() {
     void check();
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("focus", onVisibility);
-    const timer = window.setInterval(check, deployWatch ? 3000 : 10000);
+    const timer = deployWatch ? window.setInterval(check, 3000) : undefined;
     return () => {
       active = false;
-      window.clearInterval(timer);
+      if (timer) window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("focus", onVisibility);
     };
@@ -531,9 +531,11 @@ export default function Admin() {
       setDeploy({
         ...next,
         state: next.hasUpdate ? next.state : "idle",
-        message: next.hasUpdate
-          ? "새로운 GitHub 커밋이 있습니다."
-          : "현재 최신 버전입니다.",
+        message: !next.webhookConfigured
+          ? "GitHub 웹훅이 아직 연결되지 않았습니다."
+          : next.hasUpdate
+            ? "새로운 GitHub 커밋이 있습니다."
+            : "웹훅으로 새 커밋을 기다리는 중입니다.",
       });
     } catch (error) {
       setDeploy((current: any) => ({

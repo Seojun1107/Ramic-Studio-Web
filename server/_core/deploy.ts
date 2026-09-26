@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import crypto from "crypto";
 import { ENV } from "./env";
 
 const execFileAsync = promisify(execFile);
@@ -17,6 +18,7 @@ type DeployStatus = {
   currentSha: string;
   remoteSha: string;
   message: string;
+  source?: "webhook" | "manual";
   startedAt?: string;
   finishedAt?: string;
 };
@@ -28,7 +30,6 @@ let status: DeployStatus = {
   message: "배포 대기 중",
 };
 let running = false;
-let remoteCache: { sha: string; expiresAt: number } = { sha: "", expiresAt: 0 };
 
 async function command(file: string, args: string[], timeout = 120_000) {
   return execFileAsync(file, args, {
@@ -59,59 +60,57 @@ async function localSha() {
   }
 }
 
-async function remoteSha(force = false) {
-  if (!force && remoteCache.sha && remoteCache.expiresAt > Date.now())
-    return remoteCache.sha;
-  try {
-    const output = await command(
-      "git",
-      ["ls-remote", remoteUrl, `refs/heads/${branch}`],
-      30_000
-    );
-    const sha = output.stdout.trim().split(/\s+/)[0];
-    if (!sha) throw new Error("원격 저장소에서 커밋 SHA를 찾지 못했습니다.");
-    remoteCache = { sha, expiresAt: Date.now() + 8_000 };
-    return sha;
-  } catch (gitError) {
-    const response = await fetch(
-      `https://api.github.com/repos/${repo}/commits/${encodeURIComponent(branch)}`,
-      {
-        cache: "no-store",
-        headers: {
-          Accept: "application/vnd.github+json",
-          "Cache-Control": "no-cache",
-          ...(process.env.GITHUB_TOKEN
-            ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
-            : {}),
-        },
-      }
-    );
-    if (!response.ok) {
-      const detail =
-        gitError instanceof Error ? gitError.message : "git 조회 실패";
-      throw new Error(`GitHub 커밋 조회 실패 (${response.status}) · ${detail}`);
-    }
-    const data = (await response.json()) as { sha?: string };
-    if (!data.sha) throw new Error("GitHub 응답에 커밋 SHA가 없습니다.");
-    remoteCache = { sha: data.sha, expiresAt: Date.now() + 8_000 };
-    return data.sha;
-  }
+export function verifyGitHubSignature(
+  rawBody: Buffer,
+  signature: string | undefined
+) {
+  const secret = process.env.GITHUB_WEBHOOK_SECRET;
+  if (!secret || !signature?.startsWith("sha256=")) return false;
+  const expected = Buffer.from(
+    `sha256=${crypto.createHmac("sha256", secret).update(rawBody).digest("hex")}`
+  );
+  const received = Buffer.from(signature);
+  return (
+    expected.length === received.length &&
+    crypto.timingSafeEqual(expected, received)
+  );
+}
+
+export function receiveGitHubPush(payload: unknown) {
+  const event = payload as {
+    ref?: string;
+    after?: string;
+    repository?: { full_name?: string };
+    deleted?: boolean;
+  };
+  if (event.repository?.full_name && event.repository.full_name !== repo)
+    return { accepted: false, message: "다른 저장소의 웹훅입니다." };
+  if (
+    event.ref !== `refs/heads/${branch}` ||
+    event.deleted ||
+    !event.after ||
+    /^0+$/.test(event.after)
+  )
+    return { accepted: false, message: "main 브랜치 push 이벤트가 아닙니다." };
+  status = {
+    ...status,
+    state: "idle",
+    remoteSha: event.after,
+    source: "webhook",
+    message: "새로운 GitHub 커밋을 받았습니다. 업데이트할 수 있습니다.",
+  };
+  return { accepted: true, sha: event.after };
 }
 
 export async function getDeployStatus() {
   const currentSha = await localSha();
-  let remote = status.remoteSha;
-  try {
-    remote = await remoteSha();
-  } catch (error) {
-    if (!remote)
-      status.message =
-        error instanceof Error ? error.message : "GitHub 확인 실패";
-  }
-  status = { ...status, currentSha, remoteSha: remote };
+  status = { ...status, currentSha };
   return {
     ...status,
-    hasUpdate: Boolean(remote && currentSha && remote !== currentSha),
+    hasUpdate: Boolean(
+      status.remoteSha && currentSha && status.remoteSha !== currentSha
+    ),
+    webhookConfigured: Boolean(process.env.GITHUB_WEBHOOK_SECRET),
     repo,
     branch,
     pm2Name,
@@ -141,11 +140,11 @@ export async function startDeployment() {
 async function runDeployment() {
   const backupRef = await localSha();
   try {
-    const remote = await remoteSha(true);
+    const remote = status.remoteSha;
+    if (!remote) throw new Error("GitHub 웹훅으로 받은 커밋이 없습니다.");
     status = {
       ...status,
-      remoteSha: remote,
-      message: "GitHub 최신 커밋을 확인했습니다. 파일을 동기화합니다.",
+      message: "웹훅으로 받은 커밋을 동기화합니다.",
     };
     await command("git", ["fetch", "--no-tags", remoteUrl, branch]);
     const fetched = (
@@ -153,7 +152,7 @@ async function runDeployment() {
     ).stdout.trim();
     if (fetched !== remote)
       throw new Error(
-        "GitHub 커밋이 동기화 중 변경되었습니다. 다시 시도해 주세요."
+        "웹훅 커밋과 GitHub 최신 커밋이 다릅니다. 다시 시도해 주세요."
       );
     await command("git", ["reset", "--hard", "FETCH_HEAD"]);
     status = { ...status, message: "소스 동기화 완료. 의존성을 설치합니다." };
