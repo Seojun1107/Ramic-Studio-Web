@@ -6,9 +6,9 @@ import { adminProcedure, publicProcedure, router } from "./_core/trpc";
 import { createNotice, listNotices } from "./db";
 
 const fallbackNotices = [
-  { id: 1, category: "STUDIO", title: "Ramic Studio enters a new chapter of world-building.", body: "A note from the team on making games that feel like places — not products.", publishedAt: new Date("2026-09-18") },
-  { id: 2, category: "NEON VEIL", title: "The first transmission is live.", body: "A fragment from our next world is now broadcasting.", publishedAt: new Date("2026-08-29") },
-  { id: 3, category: "CAREERS", title: "We are looking for curious minds.", body: "Artists, designers, engineers, and producers — come build the unknown with us.", publishedAt: new Date("2026-07-11") },
+  { id: 1, category: "STUDIO", title: "라믹 스튜디오가 새로운 세계를 만들기 시작했습니다.", body: "게임을 제품이 아닌 장소처럼 느끼게 만드는 일에 대한 팀의 이야기입니다.", publishedAt: new Date("2026-09-18") },
+  { id: 2, category: "NEON VEIL", title: "첫 번째 신호를 공개합니다.", body: "우리가 만들고 있는 다음 세계의 조각을 지금 확인해보세요.", publishedAt: new Date("2026-08-29") },
+  { id: 3, category: "CAREERS", title: "함께 미지의 세계를 만들 동료를 찾습니다.", body: "아티스트, 디자이너, 엔지니어, 프로듀서를 기다리고 있습니다.", publishedAt: new Date("2026-07-11") },
 ];
 
 export const appRouter = router({
