@@ -41,9 +41,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // Base64 adds overhead, so allow up to ~700 MB in the request while enforcing 500 MB after decoding.
+  app.use(express.json({ limit: "700mb" }));
+  app.use(express.urlencoded({ limit: "700mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerAdminAuthRoutes(app);
@@ -59,10 +59,12 @@ async function startServer() {
     const admin = await getAdminFromRequest(req);
     if (!admin) { res.status(401).json({ message: "관리자 로그인이 필요합니다." }); return; }
     const zipBase64 = typeof req.body?.zipBase64 === "string" ? req.body.zipBase64 : "";
-    if (!zipBase64 || zipBase64.length > 70_000_000) { res.status(400).json({ message: "ZIP 파일은 50MB 이하만 업로드할 수 있습니다." }); return; }
+    if (!zipBase64 || zipBase64.length > 700_000_000) { res.status(400).json({ message: "ZIP 파일은 500MB 이하만 업로드할 수 있습니다." }); return; }
     const temp = path.join(os.tmpdir(), `ramic-${randomUUID()}.zip`); const slug = randomUUID(); const target = path.resolve(process.cwd(), "client/public/uploads/previews", slug);
     try {
-      const raw = zipBase64.replace(/^data:application\/zip;base64,/, ""); await fs.mkdir(target, { recursive: true }); await fs.writeFile(temp, Buffer.from(raw, "base64"));
+      const raw = zipBase64.replace(/^data:application\/zip;base64,/, ""); const archive = Buffer.from(raw, "base64");
+      if (archive.byteLength > 500 * 1024 * 1024) throw new Error("archive too large");
+      await fs.mkdir(target, { recursive: true }); await fs.writeFile(temp, archive);
       const listing = (await execFileAsync("unzip", ["-Z1", temp])).stdout.split(/\r?\n/).filter(Boolean);
       if (listing.some(name => path.isAbsolute(name) || name.split(/[\\/]/).includes(".."))) throw new Error("unsafe archive");
       await execFileAsync("unzip", ["-q", temp, "-d", target]);
