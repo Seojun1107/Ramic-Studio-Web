@@ -32,6 +32,7 @@ export type TeamMember = { id: string; name: string; role: string; bio: string; 
 export type SiteSettings = { id: string; logoUrl: string; instagramUrl?: string; youtubeUrl?: string; discordUrl?: string; steamUrl?: string; footerText?: string; updatedAt: Date; };
 export type InsertNotice = Pick<Notice, "category" | "title" | "body"> & {
   publishedAt?: Date;
+  coverUrl?: string | null;
 };
 
 export * from "./_core/errors";
