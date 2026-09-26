@@ -23,6 +23,8 @@ import { bootstrapAdmin, registerAdminAuthRoutes } from "./adminAuth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { hasPreviewAccess, previewCookieName } from "./previewAccess";
+import { writeSecurityLog } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -45,6 +47,16 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 
 async function startServer() {
   const app = express();
+  app.disable("x-powered-by");
+  app.set("trust proxy", 1);
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    res.setHeader("Content-Security-Policy", "frame-ancestors 'self';");
+    if (req.secure) res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    next();
+  });
   const server = createServer(app);
   const activePublicRoot =
     process.env.NODE_ENV === "production"
@@ -52,6 +64,25 @@ async function startServer() {
       : path.resolve(process.cwd(), "client/public");
   const legacyPublicRoot = path.resolve(process.cwd(), "client/public");
   const uploadRoot = path.join(activePublicRoot, "uploads");
+  app.use("/uploads/previews", (req, res, next) => {
+    const slug = req.path.split("/").filter(Boolean)[0];
+    if (!slug || !hasPreviewAccess(req, slug)) {
+      void writeSecurityLog({ event: "preview_access_denied", path: `/uploads/previews/${slug || "unknown"}`, ip: String(req.ip || req.socket.remoteAddress || "unknown").slice(0, 80), userAgent: String(req.get("user-agent") || "unknown").slice(0, 180) });
+      res.status(403).type("text").send("This preview link has expired or is invalid.");
+      return;
+    }
+    if (typeof req.query.access === "string") {
+      res.cookie(previewCookieName(), req.query.access, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: req.secure,
+        maxAge: 30 * 60 * 1000,
+        path: `/uploads/previews/${slug}`,
+      });
+    }
+    res.setHeader("Cache-Control", "private, no-store");
+    next();
+  });
   // Keep previously uploaded files readable while new deployments write to the directory served by Express.
   app.use("/uploads", express.static(uploadRoot, { fallthrough: true }));
   if (legacyPublicRoot !== activePublicRoot)
@@ -119,6 +150,7 @@ async function startServer() {
   app.post("/api/admin/upload-media", async (req, res) => {
     const admin = await getAdminFromRequest(req);
     if (!admin) {
+      void writeSecurityLog({ event: "media_upload_denied", path: req.path, ip: String(req.ip || req.socket.remoteAddress || "unknown").slice(0, 80), userAgent: String(req.get("user-agent") || "unknown").slice(0, 180) });
       res.status(401).json({ message: "관리자 로그인이 필요합니다." });
       return;
     }
@@ -170,6 +202,7 @@ async function startServer() {
     async (req, res) => {
       const admin = await getAdminFromRequest(req);
       if (!admin) {
+        void writeSecurityLog({ event: "preview_upload_denied", path: req.path, ip: String(req.ip || req.socket.remoteAddress || "unknown").slice(0, 80), userAgent: String(req.get("user-agent") || "unknown").slice(0, 180) });
         res.status(401).json({ message: "관리자 로그인이 필요합니다." });
         return;
       }
@@ -252,12 +285,23 @@ async function startServer() {
           timeout: 600_000,
           maxBuffer: 2 * 1024 * 1024,
         });
+        const extracted = await fs.readdir(target, { recursive: true });
+        for (const entry of extracted) {
+          const fullPath = path.join(target, String(entry));
+          const stat = await fs.lstat(fullPath);
+          if (stat.isSymbolicLink()) throw new Error("symlink is not allowed");
+          const realPath = await fs.realpath(fullPath);
+          const relative = path.relative(target, realPath);
+          if (relative.startsWith("..") || path.isAbsolute(relative))
+            throw new Error("unsafe extracted path");
+        }
         const normalizedIndex = indexPath
           .replaceAll("\\", "/")
           .replace(/^\/+/, "");
         res.json({
           previewUrl: `/uploads/previews/${slug}/${normalizedIndex}`,
         });
+        void writeSecurityLog({ event: "preview_upload", actor: admin.openId, path: `/uploads/previews/${slug}/${normalizedIndex}`, ip: String(req.ip || req.socket.remoteAddress || "unknown").slice(0, 80), userAgent: String(req.get("user-agent") || "unknown").slice(0, 180) });
       } catch (error) {
         await fs.rm(target, { recursive: true, force: true });
         const message =

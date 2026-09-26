@@ -142,6 +142,17 @@ body,.studio-site{background:var(--ink);color:var(--paper)}
 .notice-feedback button{border:1px solid currentColor;background:transparent;color:inherit;padding:6px 9px;font:10px var(--mono);cursor:pointer;white-space:nowrap}
 @media(max-width:520px){.notice-feedback{align-items:flex-start;flex-direction:column}.notice-feedback button{width:100%}.discord-options{padding:15px 12px}}
 
+/* Security console */
+.admin-sidebar{position:sticky;top:0;height:100vh;max-height:100vh;overflow-y:auto;z-index:30;background:#0b0c11}
+.security-log-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:42px 0 14px;padding-top:24px;border-top:1px solid var(--line)}
+.security-log-heading h3{margin:0;color:var(--paper);font:600 17px var(--display);letter-spacing:-.06em}
+.security-log-list{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);max-height:360px;overflow:auto}
+.security-log-item{display:flex;align-items:center;justify-content:space-between;gap:16px;background:#0b0c11;padding:13px 14px}
+.security-log-item strong{display:block;color:var(--paper);font:10px var(--mono);letter-spacing:.04em}
+.security-log-item span{display:block;margin-top:5px;color:#777984;font:10px var(--mono);overflow-wrap:anywhere}
+.security-log-item time{flex:0 0 auto;color:#777984;font:9px var(--mono);white-space:nowrap}
+@media(max-width:800px){.admin-sidebar{position:sticky;top:0;height:auto;max-height:none;overflow:visible}.security-log-heading{margin-top:30px}.security-log-item{align-items:flex-start;flex-direction:column;gap:8px}.security-log-item time{white-space:normal}}
+
 /* Games / scalable catalogue layout */
 .game-stage{grid-template-columns:minmax(0,1.55fr) minmax(290px,.65fr);gap:0;border:1px solid var(--line);background:#111110}
 .game-feature-image{min-height:520px;border-radius:0;border:0}

@@ -17,6 +17,7 @@ import {
   listAllTeam,
   listGames,
   listNotices,
+  listSecurityLogs,
   listTeam,
   saveSettings,
   updateGame,
@@ -63,7 +64,7 @@ export const appRouter = router({
   }),
   site: router({
     settings: publicProcedure.query(() => getSettings()),
-    games: publicProcedure.query(async () => listGames()),
+    games: publicProcedure.query(async () => listGames(true)),
     team: publicProcedure.query(async () => listTeam()),
   }),
   news: router({
@@ -125,6 +126,7 @@ export const appRouter = router({
       .mutation(({ input }) => deleteNotice(input.id)),
   }),
   admin: router({
+    securityLogs: adminProcedure.query(() => listSecurityLogs(100)),
     notices: adminProcedure.query(() => listNotices()),
     games: adminProcedure.query(() => listGames()),
     team: adminProcedure.query(() => listAllTeam()),

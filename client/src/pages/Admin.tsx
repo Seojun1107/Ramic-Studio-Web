@@ -398,6 +398,9 @@ export default function Admin() {
   });
   const games = trpc.admin.games.useQuery(undefined, { enabled: authorized });
   const team = trpc.admin.team.useQuery(undefined, { enabled: authorized });
+  const securityLogs = trpc.admin.securityLogs.useQuery(undefined, {
+    enabled: authorized && tab === "security",
+  });
   useEffect(() => {
     if (settings.data)
       setSocials({
@@ -1420,10 +1423,42 @@ export default function Admin() {
             </section>
           )}
           {tab === "security" && (
-            <section className="notice-editor">
-              <p className="eyebrow">SECURITY / ACCESS</p>
-              <h2>관리자 계정 관리</h2>
-              <form
+              <section className="notice-editor">
+                <p className="eyebrow">SECURITY / ACCESS</p>
+                <h2>관리자 계정 관리</h2>
+                <div className="security-log-heading">
+                  <h3>최근 보안 이벤트</h3>
+                  <button
+                    type="button"
+                    className="subtle-button"
+                    onClick={() => void securityLogs.refetch()}
+                  >
+                    <RefreshCw size={14} /> 새로고침
+                  </button>
+                </div>
+                <div className="security-log-list" aria-live="polite">
+                  {securityLogs.isLoading ? (
+                    <p className="empty-state">보안 로그를 불러오는 중...</p>
+                  ) : securityLogs.data?.length ? (
+                    securityLogs.data.slice(0, 30).map(log => (
+                      <article className="security-log-item" key={log.id}>
+                        <div>
+                          <strong>{log.event}</strong>
+                          <span>{log.path || log.detail || "관리자 보안 이벤트"}</span>
+                        </div>
+                        <time dateTime={new Date(log.createdAt).toISOString()}>
+                          {new Date(log.createdAt).toLocaleString("ko-KR", {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          })}
+                        </time>
+                      </article>
+                    ))
+                  ) : (
+                    <p className="empty-state">기록된 보안 이벤트가 없습니다.</p>
+                  )}
+                </div>
+                <form
                 onSubmit={e => {
                   e.preventDefault();
                   addAdmin.mutate(adminForm);
