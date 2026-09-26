@@ -10,9 +10,9 @@ const games = [
   { code: "R-03", title: "HACK.ING", meta: "실험적 인터랙티브 · 2027", image: `${asset}hacking.jpeg` },
 ];
 const fallbackNotices = [
-  { date: "2026.09.18", tag: "스튜디오", title: "라믹 스튜디오가 새로운 세계를 만들기 시작했습니다." },
-  { date: "2026.08.29", tag: "PROJECT GENESIS", title: "첫 번째 신호를 공개합니다." },
-  { date: "2026.07.11", tag: "채용", title: "함께 미지의 세계를 만들 동료를 찾습니다." },
+  { id: 1, category: "STUDIO", title: "라믹 스튜디오가 새로운 세계를 만들기 시작했습니다.", body: "", publishedAt: new Date("2026-09-18") },
+  { id: 2, category: "NEON VEIL", title: "첫 번째 신호를 공개합니다.", body: "", publishedAt: new Date("2026-08-29") },
+  { id: 3, category: "CAREERS", title: "함께 미지의 세계를 만들 동료를 찾습니다.", body: "", publishedAt: new Date("2026-07-11") },
 ];
 function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) { return <div className={`reveal ${className}`} style={{ animationDelay: `${delay}ms` }}>{children}</div>; }
 
