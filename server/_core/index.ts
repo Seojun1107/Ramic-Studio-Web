@@ -9,6 +9,7 @@ import { randomUUID } from "crypto";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { getAdminFromRequest } from "./adminAuth";
+import { getDeployStatus, startDeployment } from "./deploy";
 const execFileAsync = promisify(execFile);
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
@@ -46,6 +47,14 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerAdminAuthRoutes(app);
+  app.get("/api/admin/deploy/status", async (req, res) => {
+    if (!(await getAdminFromRequest(req))) { res.status(401).json({ message: "관리자 로그인이 필요합니다." }); return; }
+    res.json(await getDeployStatus());
+  });
+  app.post("/api/admin/deploy/update", async (req, res) => {
+    if (!(await getAdminFromRequest(req))) { res.status(401).json({ message: "관리자 로그인이 필요합니다." }); return; }
+    res.status(202).json(await startDeployment());
+  });
   app.post("/api/admin/upload-preview", async (req, res) => {
     const admin = await getAdminFromRequest(req);
     if (!admin) { res.status(401).json({ message: "관리자 로그인이 필요합니다." }); return; }
