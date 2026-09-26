@@ -28,3 +28,6 @@
 .cms-public-empty{display:grid;place-items:center;min-height:150px;padding:30px;border:1px dashed var(--line);color:#777984;font:12px var(--mono);text-align:center}.game-feature-image{position:relative;overflow:hidden}.game-feature-image-bg,.game-feature-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.game-feature-empty{position:absolute;inset:0;display:grid;place-items:center;color:#777984;font:11px var(--mono)}.team-image-empty{display:grid;place-items:center;min-height:300px;background:#151821;color:var(--lime);font:700 48px var(--display)}.team-list-placeholder{display:grid;place-items:center;width:58px;height:48px;background:#171a20;color:var(--lime);font:700 22px var(--display)}
 
 .deploy-success{border-color:#5f9f4d!important;background:#132017!important}.deploy-success b{color:var(--lime)!important}
+
+/* Deployment overlays are viewport UI, never document-flow content */
+.deploy-modal-backdrop{position:fixed!important;inset:0!important;width:100vw;height:100dvh;z-index:2147483000;overflow:auto}.deploy-toast{position:fixed!important;z-index:2147483001;max-width:calc(100vw - 32px);pointer-events:auto}@media(max-width:640px){.deploy-modal-backdrop{padding:16px}.deploy-modal{max-height:calc(100dvh - 32px);overflow:auto}.deploy-toast{left:16px;right:16px;bottom:max(16px,env(safe-area-inset-bottom));min-width:0;width:auto}}
