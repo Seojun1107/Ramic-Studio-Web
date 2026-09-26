@@ -41,9 +41,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Base64 adds overhead, so allow up to ~700 MB in the request while enforcing 500 MB after decoding.
-  app.use(express.json({ limit: "700mb" }));
-  app.use(express.urlencoded({ limit: "700mb", extended: true }));
+  // Preview ZIPs use a binary upload route below; JSON only needs to cover ordinary CMS media.
+  app.use(express.json({ limit: "80mb" }));
+  app.use(express.urlencoded({ limit: "80mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerAdminAuthRoutes(app);
@@ -69,21 +69,32 @@ async function startServer() {
     try { await fs.mkdir(targetDir, { recursive: true }); await fs.writeFile(target, Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64")); res.json({ url: `/uploads/media/${fileName}` }); }
     catch { res.status(500).json({ message: "미디어를 저장할 수 없습니다." }); }
   });
-  app.post("/api/admin/upload-preview", async (req, res) => {
+  app.post("/api/admin/upload-preview", express.raw({ type: ["application/zip", "application/octet-stream"], limit: "500mb" }), async (req, res) => {
     const admin = await getAdminFromRequest(req);
     if (!admin) { res.status(401).json({ message: "관리자 로그인이 필요합니다." }); return; }
-    const zipBase64 = typeof req.body?.zipBase64 === "string" ? req.body.zipBase64 : "";
-    if (!zipBase64 || zipBase64.length > 700_000_000) { res.status(400).json({ message: "ZIP 파일은 500MB 이하만 업로드할 수 있습니다." }); return; }
+    const body = req.body as Buffer | { zipBase64?: string } | undefined;
+    const archive = Buffer.isBuffer(body) ? body : typeof body?.zipBase64 === "string" ? Buffer.from(body.zipBase64.replace(/^data:application\/zip;base64,/, ""), "base64") : null;
+    if (!archive?.byteLength || archive.byteLength > 500 * 1024 * 1024) { res.status(400).json({ message: "ZIP 파일은 500MB 이하만 업로드할 수 있습니다." }); return; }
     const temp = path.join(os.tmpdir(), `ramic-${randomUUID()}.zip`); const slug = randomUUID(); const target = path.resolve(process.cwd(), "client/public/uploads/previews", slug);
     try {
-      const raw = zipBase64.replace(/^data:application\/zip;base64,/, ""); const archive = Buffer.from(raw, "base64");
-      if (archive.byteLength > 500 * 1024 * 1024) throw new Error("archive too large");
       await fs.mkdir(target, { recursive: true }); await fs.writeFile(temp, archive);
-      const listing = (await execFileAsync("unzip", ["-Z1", temp])).stdout.split(/\r?\n/).filter(Boolean);
+      const listing = (await execFileAsync("unzip", ["-Z1", temp], { maxBuffer: 12 * 1024 * 1024, timeout: 120_000 })).stdout.split(/\r?\n/).map(name => name.trim()).filter(Boolean);
+      if (listing.length > 100_000) throw new Error("archive has too many files");
       if (listing.some(name => path.isAbsolute(name) || name.split(/[\\/]/).includes(".."))) throw new Error("unsafe archive");
-      await execFileAsync("unzip", ["-q", temp, "-d", target]);
-      res.json({ previewUrl: `/uploads/previews/${slug}/index.html` });
-    } catch { await fs.rm(target, { recursive: true, force: true }); res.status(400).json({ message: "안전한 웹게임 ZIP만 업로드할 수 있습니다." }); } finally { await fs.rm(temp, { force: true }); }
+      let indexPath = listing.find(name => name.toLowerCase() === "index.html" || name.toLowerCase().endsWith("/index.html") || name.toLowerCase().endsWith("\\index.html"));
+      if (!indexPath) {
+        const loaderPath = listing.find(name => /(^|[\\/])[^\\/]+\.loader\.js$/i.test(name));
+        if (!loaderPath) throw new Error("index.html missing");
+        const normalizedLoader = loaderPath.replaceAll("\\", "/"); const loaderFile = normalizedLoader.split("/").pop()!; const base = loaderFile.replace(/\.loader\.js$/i, ""); const dir = normalizedLoader.includes("/") ? normalizedLoader.slice(0, normalizedLoader.lastIndexOf("/")) : ".";
+        const files = new Set(listing.map(name => name.replaceAll("\\", "/").toLowerCase())); const file = (name: string) => `${dir === "." ? "" : `${dir}/`}${name}`.toLowerCase();
+        if (!files.has(file(`${base}.data`)) || !files.has(file(`${base}.framework.js`)) || !files.has(file(`${base}.wasm`))) throw new Error("index.html missing");
+        const generated = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ramic Studio Web Preview</title><style>html,body{margin:0;width:100%;height:100%;background:#08090d;overflow:hidden}#unity-container,#unity-canvas{width:100%;height:100%;display:block}#loading{position:fixed;inset:auto 24px 24px;color:#cbff4d;font:12px monospace;z-index:2}</style></head><body><div id="unity-container"><canvas id="unity-canvas" tabindex="-1"></canvas></div><div id="loading">LOADING WEB PREVIEW</div><script src="${loaderFile}"></script><script>createUnityInstance(document.querySelector("#unity-canvas"),{dataUrl:"${base}.data",frameworkUrl:"${base}.framework.js",codeUrl:"${base}.wasm",streamingAssetsUrl:"StreamingAssets",companyName:"Ramic Studio",productName:"Web Preview",productVersion:"1.0"},p=>{document.querySelector("#loading").textContent="LOADING WEB PREVIEW "+Math.round(p*100)+"%"}).then(()=>document.querySelector("#loading").remove()).catch(e=>{document.querySelector("#loading").textContent="WEB PREVIEW FAILED";console.error(e)});</script></body></html>`;
+        await fs.mkdir(path.join(target, dir), { recursive: true }); await fs.writeFile(path.join(target, dir, "index.html"), generated, "utf8"); indexPath = `${dir === "." ? "" : `${dir}/`}index.html`;
+      }
+      await execFileAsync("unzip", ["-q", temp, "-d", target], { timeout: 600_000, maxBuffer: 2 * 1024 * 1024 });
+      const normalizedIndex = indexPath.replaceAll("\\", "/").replace(/^\/+/, "");
+      res.json({ previewUrl: `/uploads/previews/${slug}/${normalizedIndex}` });
+    } catch (error) { await fs.rm(target, { recursive: true, force: true }); const message = error instanceof Error && error.message === "index.html missing" ? "index.html 또는 Unity WebGL 빌드의 loader/data/framework/wasm 파일을 찾지 못했습니다." : "안전한 웹게임 ZIP만 업로드할 수 있습니다."; res.status(400).json({ message }); } finally { await fs.rm(temp, { force: true }); }
   });
   await bootstrapAdmin();
   // tRPC API
