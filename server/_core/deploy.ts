@@ -22,6 +22,7 @@ type DeployStatus = {
 
 let status: DeployStatus = { state: "idle", currentSha: "", remoteSha: "", message: "배포 대기 중" };
 let running = false;
+let remoteCache: { sha: string; expiresAt: number } = { sha: "", expiresAt: 0 };
 
 async function command(file: string, args: string[], timeout = 120_000) {
   return execFileAsync(file, args, {
@@ -52,7 +53,8 @@ async function localSha() {
   }
 }
 
-async function remoteSha() {
+async function remoteSha(force = false) {
+  if (!force && remoteCache.sha && remoteCache.expiresAt > Date.now()) return remoteCache.sha;
   const response = await fetch(`https://api.github.com/repos/${repo}/commits/${encodeURIComponent(branch)}`, {
     cache: "no-store",
     headers: { Accept: "application/vnd.github+json", "Cache-Control": "no-cache", ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) },
@@ -60,6 +62,7 @@ async function remoteSha() {
   if (!response.ok) throw new Error(`GitHub 커밋 조회 실패 (${response.status})`);
   const data = (await response.json()) as { sha?: string };
   if (!data.sha) throw new Error("GitHub 응답에 커밋 SHA가 없습니다.");
+  remoteCache = { sha: data.sha, expiresAt: Date.now() + 8_000 };
   return data.sha;
 }
 
@@ -82,7 +85,7 @@ export async function startDeployment() {
 async function runDeployment() {
   const backupRef = await localSha();
   try {
-    const remote = await remoteSha();
+    const remote = await remoteSha(true);
     status = { ...status, remoteSha: remote, message: "GitHub 최신 커밋을 확인했습니다. 파일을 동기화합니다." };
     await command("git", ["fetch", "origin", branch]);
     const fetched = (await command("git", ["rev-parse", `origin/${branch}`], 15_000)).stdout.trim();
