@@ -55,6 +55,18 @@ async function startServer() {
     if (!(await getAdminFromRequest(req))) { res.status(401).json({ message: "관리자 로그인이 필요합니다." }); return; }
     res.status(202).json(await startDeployment());
   });
+  app.post("/api/admin/upload-media", async (req, res) => {
+    const admin = await getAdminFromRequest(req);
+    if (!admin) { res.status(401).json({ message: "관리자 로그인이 필요합니다." }); return; }
+    const dataUrl = typeof req.body?.dataUrl === "string" ? req.body.dataUrl : "";
+    const mimeType = typeof req.body?.mimeType === "string" ? req.body.mimeType : "";
+    const allowed = /^(image\/(jpeg|png|gif|webp|svg\+xml)|video\/(mp4|webm|quicktime))$/i.test(mimeType);
+    if (!allowed || !dataUrl.startsWith(`data:${mimeType};base64,`) || dataUrl.length > 70_000_000) { res.status(400).json({ message: "지원하지 않는 미디어 형식이거나 파일이 너무 큽니다. (최대 50MB)" }); return; }
+    const extension = mimeType.split("/")[1].replace("svg+xml", "svg").replace("quicktime", "mov");
+    const targetDir = path.resolve(process.cwd(), "client/public/uploads/media"); const fileName = `${randomUUID()}.${extension}`; const target = path.join(targetDir, fileName);
+    try { await fs.mkdir(targetDir, { recursive: true }); await fs.writeFile(target, Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64")); res.json({ url: `/uploads/media/${fileName}` }); }
+    catch { res.status(500).json({ message: "미디어를 저장할 수 없습니다." }); }
+  });
   app.post("/api/admin/upload-preview", async (req, res) => {
     const admin = await getAdminFromRequest(req);
     if (!admin) { res.status(401).json({ message: "관리자 로그인이 필요합니다." }); return; }
