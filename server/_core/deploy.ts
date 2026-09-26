@@ -93,4 +93,3 @@ async function runDeployment() {
 async function fileExists(name: string) {
   try { await fs.access(path.join(repoRoot, name)); return true; } catch { return false; }
 }
-EOF
