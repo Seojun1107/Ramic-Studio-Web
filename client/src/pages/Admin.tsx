@@ -379,6 +379,7 @@ export default function Admin() {
     youtubeUrl: "",
     discordUrl: "",
     steamUrl: "",
+    socialLinks: [] as Array<{ label: string; url: string }>,
     footerText: "",
   });
   const [adminForm, setAdminForm] = useState({
@@ -409,6 +410,16 @@ export default function Admin() {
         youtubeUrl: settings.data.youtubeUrl ?? "",
         discordUrl: settings.data.discordUrl ?? "",
         steamUrl: settings.data.steamUrl ?? "",
+        socialLinks:
+          settings.data.socialLinks ??
+          [
+            ["인스타그램", settings.data.instagramUrl ?? ""],
+            ["유튜브", settings.data.youtubeUrl ?? ""],
+            ["디스코드", settings.data.discordUrl ?? ""],
+            ["스팀", settings.data.steamUrl ?? ""],
+          ]
+            .filter(([, url]) => url)
+            .map(([label, url]) => ({ label, url })),
         footerText: settings.data.footerText ?? "",
       });
   }, [settings.data]);
@@ -482,7 +493,10 @@ export default function Admin() {
       void utils.admin.notices.invalidate();
     },
     onError: error =>
-      setNoticeFeedback({ tone: "error", message: `공지 발행 실패: ${error.message}` }),
+      setNoticeFeedback({
+        tone: "error",
+        message: `공지 발행 실패: ${error.message}`,
+      }),
   });
   const updateNotice = trpc.news.update.useMutation({
     onSuccess: result => {
@@ -495,7 +509,10 @@ export default function Admin() {
       void utils.admin.notices.invalidate();
     },
     onError: error =>
-      setNoticeFeedback({ tone: "error", message: `공지 수정 실패: ${error.message}` }),
+      setNoticeFeedback({
+        tone: "error",
+        message: `공지 수정 실패: ${error.message}`,
+      }),
   });
   const removeNotice = trpc.news.remove.useMutation({
     onSuccess: () => void utils.admin.notices.invalidate(),
@@ -891,7 +908,10 @@ export default function Admin() {
                       type="checkbox"
                       checked={notice.discordNotify}
                       onChange={e =>
-                        setNotice({ ...notice, discordNotify: e.target.checked })
+                        setNotice({
+                          ...notice,
+                          discordNotify: e.target.checked,
+                        })
                       }
                     />
                     Discord에도 같은 공지를 전송
@@ -933,7 +953,10 @@ export default function Admin() {
                             rows={6}
                             value={notice.discordBody}
                             onChange={e =>
-                              setNotice({ ...notice, discordBody: e.target.value })
+                              setNotice({
+                                ...notice,
+                                discordBody: e.target.value,
+                              })
                             }
                             placeholder="Discord에만 보낼 문구를 입력하세요."
                             required
@@ -1361,8 +1384,15 @@ export default function Admin() {
                   saveSettings.mutate(socials);
                 }}
               >
+                <UploadField
+                  label="사이트 로고 파일"
+                  accept="image/*"
+                  value={socials.logoUrl}
+                  onChange={url => setSocials({ ...socials, logoUrl: url })}
+                  help="SVG, PNG, JPG 파일을 업로드하면 헤더·푸터·파비콘에 함께 적용됩니다"
+                />
                 <label>
-                  사이트 로고 URL
+                  사이트 로고 URL (직접 입력)
                   <input
                     value={socials.logoUrl}
                     onChange={e =>
@@ -1371,42 +1401,89 @@ export default function Admin() {
                     placeholder="/assets/RamicStudio.svg"
                   />
                 </label>
-                <label>
-                  Instagram URL
-                  <input
-                    value={socials.instagramUrl}
-                    onChange={e =>
-                      setSocials({ ...socials, instagramUrl: e.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  YouTube URL
-                  <input
-                    value={socials.youtubeUrl}
-                    onChange={e =>
-                      setSocials({ ...socials, youtubeUrl: e.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  Discord URL
-                  <input
-                    value={socials.discordUrl}
-                    onChange={e =>
-                      setSocials({ ...socials, discordUrl: e.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  Steam URL
-                  <input
-                    value={socials.steamUrl}
-                    onChange={e =>
-                      setSocials({ ...socials, steamUrl: e.target.value })
-                    }
-                  />
-                </label>
+                <div className="social-editor">
+                  <div className="social-editor-head">
+                    <div>
+                      <span className="field-title">푸터 SNS 링크</span>
+                      <small>
+                        표시할 이름과 URL을 자유롭게 추가하거나 삭제할 수
+                        있습니다.
+                      </small>
+                    </div>
+                    <button
+                      type="button"
+                      className="upload-button"
+                      onClick={() =>
+                        setSocials({
+                          ...socials,
+                          socialLinks: [
+                            ...socials.socialLinks,
+                            { label: "새 링크", url: "" },
+                          ],
+                        })
+                      }
+                    >
+                      <Plus size={14} /> 링크 추가
+                    </button>
+                  </div>
+                  <div className="social-editor-list">
+                    {socials.socialLinks.map((link, index) => (
+                      <div
+                        className="social-editor-row"
+                        key={`${index}-${link.label}`}
+                      >
+                        <input
+                          aria-label={`SNS ${index + 1} 이름`}
+                          value={link.label}
+                          onChange={e =>
+                            setSocials({
+                              ...socials,
+                              socialLinks: socials.socialLinks.map(
+                                (item, itemIndex) =>
+                                  itemIndex === index
+                                    ? { ...item, label: e.target.value }
+                                    : item
+                              ),
+                            })
+                          }
+                          placeholder="표시 이름"
+                        />
+                        <input
+                          aria-label={`SNS ${index + 1} URL`}
+                          value={link.url}
+                          onChange={e =>
+                            setSocials({
+                              ...socials,
+                              socialLinks: socials.socialLinks.map(
+                                (item, itemIndex) =>
+                                  itemIndex === index
+                                    ? { ...item, url: e.target.value }
+                                    : item
+                              ),
+                            })
+                          }
+                          placeholder="https://..."
+                          type="url"
+                        />
+                        <button
+                          type="button"
+                          className="icon-danger-button"
+                          aria-label={`${link.label || "SNS 링크"} 삭제`}
+                          onClick={() =>
+                            setSocials({
+                              ...socials,
+                              socialLinks: socials.socialLinks.filter(
+                                (_, itemIndex) => itemIndex !== index
+                              ),
+                            })
+                          }
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 <label>
                   푸터 문구
                   <input
@@ -1423,42 +1500,44 @@ export default function Admin() {
             </section>
           )}
           {tab === "security" && (
-              <section className="notice-editor">
-                <p className="eyebrow">SECURITY / ACCESS</p>
-                <h2>관리자 계정 관리</h2>
-                <div className="security-log-heading">
-                  <h3>최근 보안 이벤트</h3>
-                  <button
-                    type="button"
-                    className="subtle-button"
-                    onClick={() => void securityLogs.refetch()}
-                  >
-                    <RefreshCw size={14} /> 새로고침
-                  </button>
-                </div>
-                <div className="security-log-list" aria-live="polite">
-                  {securityLogs.isLoading ? (
-                    <p className="empty-state">보안 로그를 불러오는 중...</p>
-                  ) : securityLogs.data?.length ? (
-                    securityLogs.data.slice(0, 30).map(log => (
-                      <article className="security-log-item" key={log.id}>
-                        <div>
-                          <strong>{log.event}</strong>
-                          <span>{log.path || log.detail || "관리자 보안 이벤트"}</span>
-                        </div>
-                        <time dateTime={new Date(log.createdAt).toISOString()}>
-                          {new Date(log.createdAt).toLocaleString("ko-KR", {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                          })}
-                        </time>
-                      </article>
-                    ))
-                  ) : (
-                    <p className="empty-state">기록된 보안 이벤트가 없습니다.</p>
-                  )}
-                </div>
-                <form
+            <section className="notice-editor">
+              <p className="eyebrow">SECURITY / ACCESS</p>
+              <h2>관리자 계정 관리</h2>
+              <div className="security-log-heading">
+                <h3>최근 보안 이벤트</h3>
+                <button
+                  type="button"
+                  className="subtle-button"
+                  onClick={() => void securityLogs.refetch()}
+                >
+                  <RefreshCw size={14} /> 새로고침
+                </button>
+              </div>
+              <div className="security-log-list" aria-live="polite">
+                {securityLogs.isLoading ? (
+                  <p className="empty-state">보안 로그를 불러오는 중...</p>
+                ) : securityLogs.data?.length ? (
+                  securityLogs.data.slice(0, 30).map(log => (
+                    <article className="security-log-item" key={log.id}>
+                      <div>
+                        <strong>{log.event}</strong>
+                        <span>
+                          {log.path || log.detail || "관리자 보안 이벤트"}
+                        </span>
+                      </div>
+                      <time dateTime={new Date(log.createdAt).toISOString()}>
+                        {new Date(log.createdAt).toLocaleString("ko-KR", {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })}
+                      </time>
+                    </article>
+                  ))
+                ) : (
+                  <p className="empty-state">기록된 보안 이벤트가 없습니다.</p>
+                )}
+              </div>
+              <form
                 onSubmit={e => {
                   e.preventDefault();
                   addAdmin.mutate(adminForm);

@@ -12,7 +12,9 @@ export type User = {
   lastSignedIn: Date;
 };
 
-export type InsertUser = Partial<Omit<User, "id" | "createdAt" | "updatedAt">> & {
+export type InsertUser = Partial<
+  Omit<User, "id" | "createdAt" | "updatedAt">
+> & {
   openId: string;
 };
 
@@ -27,9 +29,45 @@ export type Notice = {
   updatedAt: Date;
   coverUrl?: string | null;
 };
-export type Game = { id: string; code: string; title: string; description: string; genre: string; status: string; imageUrl: string; videoUrl?: string | null; externalUrl?: string | null; externalLabel?: string | null; isNew: boolean; previewUrl?: string | null; createdAt: Date; updatedAt: Date; };
-export type TeamMember = { id: string; name: string; role: string; bio: string; imageUrl?: string | null; sortOrder: number; isPublic: boolean; createdAt: Date; updatedAt: Date; };
-export type SiteSettings = { id: string; logoUrl: string; instagramUrl?: string; youtubeUrl?: string; discordUrl?: string; steamUrl?: string; footerText?: string; updatedAt: Date; };
+export type Game = {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  genre: string;
+  status: string;
+  imageUrl: string;
+  videoUrl?: string | null;
+  externalUrl?: string | null;
+  externalLabel?: string | null;
+  isNew: boolean;
+  previewUrl?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+export type TeamMember = {
+  id: string;
+  name: string;
+  role: string;
+  bio: string;
+  imageUrl?: string | null;
+  sortOrder: number;
+  isPublic: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+export type SocialLink = { label: string; url: string };
+export type SiteSettings = {
+  id: string;
+  logoUrl: string;
+  instagramUrl?: string;
+  youtubeUrl?: string;
+  discordUrl?: string;
+  steamUrl?: string;
+  socialLinks?: SocialLink[];
+  footerText?: string;
+  updatedAt: Date;
+};
 export type InsertNotice = Pick<Notice, "category" | "title" | "body"> & {
   publishedAt?: Date;
   coverUrl?: string | null;

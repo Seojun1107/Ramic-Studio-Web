@@ -1,42 +1,437 @@
-import { MongoClient, type Collection, type Db, type Document, ObjectId } from "mongodb";
-import type { Game, InsertNotice, Notice, SiteSettings, TeamMember, User, InsertUser } from "../shared/types";
+import {
+  MongoClient,
+  type Collection,
+  type Db,
+  type Document,
+  ObjectId,
+} from "mongodb";
+import type {
+  Game,
+  InsertNotice,
+  Notice,
+  SiteSettings,
+  TeamMember,
+  User,
+  InsertUser,
+  SocialLink,
+} from "../shared/types";
 import { ENV } from "./_core/env";
 import { signedPreviewUrl } from "./_core/previewAccess";
 type AnyDoc = Document & Record<string, any>;
-let client: MongoClient | null = null; let database: Db | null = null; let connecting: Promise<Db | null> | null = null;
-export async function getDb(): Promise<Db | null> { if (database) return database; if (!ENV.mongoUri) return null; if (!connecting) connecting = (async () => { try { client = new MongoClient(ENV.mongoUri, { serverSelectionTimeoutMS: 3000 }); await client.connect(); database = client.db(ENV.mongoDb); await Promise.all([database.collection("users").createIndex({ openId: 1 }, { unique: true }), database.collection("users").createIndex({ username: 1 }, { unique: true, sparse: true }), database.collection("notices").createIndex({ publishedAt: -1 }), database.collection("games").createIndex({ createdAt: -1 }), database.collection("team").createIndex({ sortOrder: 1 }), database.collection("security_logs").createIndex({ createdAt: -1 })]); return database; } catch (error) { console.warn("[MongoDB] unavailable:", error instanceof Error ? error.message : error); await client?.close().catch(() => undefined); client = null; return null; } finally { connecting = null; } })(); return connecting; }
-async function col<T extends AnyDoc>(name: string): Promise<Collection<T> | null> { const db = await getDb(); return db ? db.collection<T>(name) : null; }
-const date = (v: any) => v instanceof Date ? v : new Date(v);
-function id(v: any) { return String(v?._id ?? v?.id ?? ""); }
-export function normalizeMongoUser(d: AnyDoc): User { return { id: id(d), openId: d.openId, name: d.name ?? null, email: d.email ?? null, loginMethod: d.loginMethod ?? null, role: d.role === "admin" ? "admin" : "user", createdAt: date(d.createdAt), updatedAt: date(d.updatedAt), lastSignedIn: date(d.lastSignedIn) }; }
-const normalizeNotice = (d: AnyDoc): Notice => ({ id: id(d), category: d.category, title: d.title, body: d.body, coverUrl: d.coverUrl ?? null, publishedAt: date(d.publishedAt), createdAt: date(d.createdAt), updatedAt: date(d.updatedAt) });
-export function createNoticeDocument(input: InsertNotice) { const now = new Date(); return { category: input.category, title: input.title.trim(), body: input.body.trim(), coverUrl: input.coverUrl ?? null, publishedAt: input.publishedAt ?? now, createdAt: now, updatedAt: now }; }
-const normalizeGame = (d: AnyDoc, protectPreview = false): Game => ({ id: id(d), code: d.code, title: d.title, description: d.description ?? "", genre: d.genre ?? "", status: d.status ?? "개발 중", imageUrl: d.imageUrl ?? "", videoUrl: d.videoUrl ?? null, externalUrl: d.externalUrl ?? null, externalLabel: d.externalLabel ?? "STEAM", isNew: Boolean(d.isNew), previewUrl: protectPreview ? signedPreviewUrl(d.previewUrl) : d.previewUrl ?? null, createdAt: date(d.createdAt), updatedAt: date(d.updatedAt) });
-const normalizeTeam = (d: AnyDoc): TeamMember => ({ id: id(d), name: d.name, role: d.role, bio: d.bio ?? "", imageUrl: d.imageUrl ?? null, sortOrder: d.sortOrder ?? 0, isPublic: d.isPublic !== false, createdAt: date(d.createdAt), updatedAt: date(d.updatedAt) });
-export async function getUserByOpenId(openId: string) { const c = await col("users"); const d = await c?.findOne({ openId }); return d ? normalizeMongoUser(d) : undefined; }
-export async function upsertUser(user: InsertUser) { const c = await col("users"); if (!c) return; const now = new Date(); await c.updateOne({ openId: user.openId }, { $set: { ...user, updatedAt: now, lastSignedIn: user.lastSignedIn ?? now }, $setOnInsert: { createdAt: now, role: user.role ?? "user" } }, { upsert: true }); }
-export async function getAdminByUsername(username: string) { const c = await col("users"); return (await c?.findOne({ username, role: "admin" })) ?? null; }
-export async function ensureAdminAccount(username: string, passwordHash: string) { const c = await col("users"); if (!c) return; const now = new Date(); await c.updateOne({ username }, { $setOnInsert: { username, passwordHash, role: "admin", name: "Ramic Studio Admin", openId: `admin:${username}`, createdAt: now, updatedAt: now, lastSignedIn: now } }, { upsert: true }); }
-export async function listNotices() { const c = await col("notices"); return c ? (await c.find({}).sort({ publishedAt: -1 }).limit(100).toArray()).map(normalizeNotice) : []; }
-export async function getNotice(idValue: string) { const c = await col("notices"); const d = c ? await c.findOne({ _id: ObjectId.isValid(idValue) ? new ObjectId(idValue) : idValue } as any) : null; return d ? normalizeNotice(d) : null; }
-export async function createNotice(input: InsertNotice) { const c = await col("notices"); if (!c) return null; const d = createNoticeDocument(input); const r = await c.insertOne(d); return normalizeNotice({ ...d, _id: r.insertedId }); }
-function documentId(value: string) { return ObjectId.isValid(value) ? new ObjectId(value) : value; }
-export async function updateNotice(idValue: string, input: InsertNotice) { const c = await col("notices"); if (!c) return null; const result = await c.findOneAndUpdate({ _id: documentId(idValue) } as any, { $set: { category: input.category, title: input.title.trim(), body: input.body.trim(), coverUrl: input.coverUrl ?? null, publishedAt: input.publishedAt ?? new Date(), updatedAt: new Date() } }, { returnDocument: "after" }); return result ? normalizeNotice(result) : null; }
-export async function deleteNotice(idValue: string) { const c = await col("notices"); if (!c) return false; return (await c.deleteOne({ _id: documentId(idValue) } as any)).deletedCount > 0; }
-export async function listGames(protectPreview = false) { const c = await col("games"); return c ? (await c.find({}).sort({ createdAt: -1 }).toArray()).map(d => normalizeGame(d, protectPreview)) : []; }
-function singleGameMedia(input: Omit<Game, "id" | "createdAt" | "updatedAt">) { return input.videoUrl ? { ...input, imageUrl: "", videoUrl: input.videoUrl } : { ...input, imageUrl: input.imageUrl ?? "", videoUrl: null }; }
-export async function createGame(input: Omit<Game, "id" | "createdAt" | "updatedAt">) { const c = await col("games"); if (!c) return null; const now = new Date(); const d = { ...singleGameMedia(input), createdAt: now, updatedAt: now }; const r = await c.insertOne(d); return normalizeGame({ ...d, _id: r.insertedId }); }
-export async function updateGame(idValue: string, input: Omit<Game, "id" | "createdAt" | "updatedAt">) { const c = await col("games"); if (!c) return null; const result = await c.findOneAndUpdate({ _id: documentId(idValue) } as any, { $set: { ...singleGameMedia(input), updatedAt: new Date() } }, { returnDocument: "after" }); return result ? normalizeGame(result) : null; }
-export async function deleteGame(idValue: string) { const c = await col("games"); if (!c) return false; return (await c.deleteOne({ _id: documentId(idValue) } as any)).deletedCount > 0; }
-export async function listTeam() { const c = await col("team"); return c ? (await c.find({ isPublic: { $ne: false } }).sort({ sortOrder: 1 }).toArray()).map(normalizeTeam) : []; }
-export async function createTeam(input: Omit<TeamMember, "id" | "createdAt" | "updatedAt">) { const c = await col("team"); if (!c) return null; const now = new Date(); const d = { ...input, createdAt: now, updatedAt: now }; const r = await c.insertOne(d); return normalizeTeam({ ...d, _id: r.insertedId }); }
-export async function listAllTeam() { const c = await col("team"); return c ? (await c.find({}).sort({ sortOrder: 1, createdAt: 1 }).toArray()).map(normalizeTeam) : []; }
-export async function updateTeam(idValue: string, input: Omit<TeamMember, "id" | "createdAt" | "updatedAt">) { const c = await col("team"); if (!c) return null; const result = await c.findOneAndUpdate({ _id: documentId(idValue) } as any, { $set: { ...input, updatedAt: new Date() } }, { returnDocument: "after" }); return result ? normalizeTeam(result) : null; }
-export async function deleteTeam(idValue: string) { const c = await col("team"); if (!c) return false; return (await c.deleteOne({ _id: documentId(idValue) } as any)).deletedCount > 0; }
-export async function getSettings(): Promise<SiteSettings> { const c = await col("settings"); const d = await c?.findOne({ _id: "site" } as any); return { id: "site", logoUrl: d?.logoUrl ?? "/assets/RamicStudio.svg", instagramUrl: d?.instagramUrl ?? "", youtubeUrl: d?.youtubeUrl ?? "", discordUrl: d?.discordUrl ?? "", steamUrl: d?.steamUrl ?? "", footerText: d?.footerText ?? "© 2026 RAMIC STUDIO. 호기심으로 만듭니다.", updatedAt: date(d?.updatedAt ?? new Date()) }; }
-export async function saveSettings(input: Partial<SiteSettings>) { const c = await col("settings"); if (!c) return getSettings(); const now = new Date(); await c.updateOne({ _id: "site" } as any, { $set: { ...input, updatedAt: now } }, { upsert: true }); return getSettings(); }
-export async function addAdmin(username: string, passwordHash: string, name: string) { const c = await col("users"); if (!c) return; const now = new Date(); await c.updateOne({ username }, { $set: { username, passwordHash, name, role: "admin", updatedAt: now }, $setOnInsert: { openId: `admin:${username}`, createdAt: now, lastSignedIn: now } }, { upsert: true }); }
-export async function changeAdminPassword(username: string, passwordHash: string) { const c = await col("users"); if (c) await c.updateOne({ username, role: "admin" }, { $set: { passwordHash, updatedAt: new Date() } }); }
-export type SecurityEvent = { event: string; username?: string; actor?: string; ip?: string; userAgent?: string; path?: string; detail?: string; createdAt: Date };
-export async function writeSecurityLog(input: Omit<SecurityEvent, "createdAt">) { const c = await col("security_logs"); if (!c) return; await c.insertOne({ ...input, createdAt: new Date() }); }
-export async function listSecurityLogs(limit = 100) { const c = await col("security_logs"); if (!c) return []; return (await c.find({}).sort({ createdAt: -1 }).limit(Math.min(limit, 200)).toArray()).map(d => ({ id: id(d), event: String(d.event ?? "unknown"), username: d.username ?? "", actor: d.actor ?? "", ip: d.ip ?? "", userAgent: d.userAgent ?? "", path: d.path ?? "", detail: d.detail ?? "", createdAt: date(d.createdAt) })); }
+let client: MongoClient | null = null;
+let database: Db | null = null;
+let connecting: Promise<Db | null> | null = null;
+export async function getDb(): Promise<Db | null> {
+  if (database) return database;
+  if (!ENV.mongoUri) return null;
+  if (!connecting)
+    connecting = (async () => {
+      try {
+        client = new MongoClient(ENV.mongoUri, {
+          serverSelectionTimeoutMS: 3000,
+        });
+        await client.connect();
+        database = client.db(ENV.mongoDb);
+        await Promise.all([
+          database
+            .collection("users")
+            .createIndex({ openId: 1 }, { unique: true }),
+          database
+            .collection("users")
+            .createIndex({ username: 1 }, { unique: true, sparse: true }),
+          database.collection("notices").createIndex({ publishedAt: -1 }),
+          database.collection("games").createIndex({ createdAt: -1 }),
+          database.collection("team").createIndex({ sortOrder: 1 }),
+          database.collection("security_logs").createIndex({ createdAt: -1 }),
+        ]);
+        return database;
+      } catch (error) {
+        console.warn(
+          "[MongoDB] unavailable:",
+          error instanceof Error ? error.message : error
+        );
+        await client?.close().catch(() => undefined);
+        client = null;
+        return null;
+      } finally {
+        connecting = null;
+      }
+    })();
+  return connecting;
+}
+async function col<T extends AnyDoc>(
+  name: string
+): Promise<Collection<T> | null> {
+  const db = await getDb();
+  return db ? db.collection<T>(name) : null;
+}
+const date = (v: any) => (v instanceof Date ? v : new Date(v));
+function id(v: any) {
+  return String(v?._id ?? v?.id ?? "");
+}
+export function normalizeMongoUser(d: AnyDoc): User {
+  return {
+    id: id(d),
+    openId: d.openId,
+    name: d.name ?? null,
+    email: d.email ?? null,
+    loginMethod: d.loginMethod ?? null,
+    role: d.role === "admin" ? "admin" : "user",
+    createdAt: date(d.createdAt),
+    updatedAt: date(d.updatedAt),
+    lastSignedIn: date(d.lastSignedIn),
+  };
+}
+const normalizeNotice = (d: AnyDoc): Notice => ({
+  id: id(d),
+  category: d.category,
+  title: d.title,
+  body: d.body,
+  coverUrl: d.coverUrl ?? null,
+  publishedAt: date(d.publishedAt),
+  createdAt: date(d.createdAt),
+  updatedAt: date(d.updatedAt),
+});
+export function createNoticeDocument(input: InsertNotice) {
+  const now = new Date();
+  return {
+    category: input.category,
+    title: input.title.trim(),
+    body: input.body.trim(),
+    coverUrl: input.coverUrl ?? null,
+    publishedAt: input.publishedAt ?? now,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+const normalizeGame = (d: AnyDoc, protectPreview = false): Game => ({
+  id: id(d),
+  code: d.code,
+  title: d.title,
+  description: d.description ?? "",
+  genre: d.genre ?? "",
+  status: d.status ?? "개발 중",
+  imageUrl: d.imageUrl ?? "",
+  videoUrl: d.videoUrl ?? null,
+  externalUrl: d.externalUrl ?? null,
+  externalLabel: d.externalLabel ?? "STEAM",
+  isNew: Boolean(d.isNew),
+  previewUrl: protectPreview
+    ? signedPreviewUrl(d.previewUrl)
+    : (d.previewUrl ?? null),
+  createdAt: date(d.createdAt),
+  updatedAt: date(d.updatedAt),
+});
+const normalizeTeam = (d: AnyDoc): TeamMember => ({
+  id: id(d),
+  name: d.name,
+  role: d.role,
+  bio: d.bio ?? "",
+  imageUrl: d.imageUrl ?? null,
+  sortOrder: d.sortOrder ?? 0,
+  isPublic: d.isPublic !== false,
+  createdAt: date(d.createdAt),
+  updatedAt: date(d.updatedAt),
+});
+export async function getUserByOpenId(openId: string) {
+  const c = await col("users");
+  const d = await c?.findOne({ openId });
+  return d ? normalizeMongoUser(d) : undefined;
+}
+export async function upsertUser(user: InsertUser) {
+  const c = await col("users");
+  if (!c) return;
+  const now = new Date();
+  await c.updateOne(
+    { openId: user.openId },
+    {
+      $set: { ...user, updatedAt: now, lastSignedIn: user.lastSignedIn ?? now },
+      $setOnInsert: { createdAt: now, role: user.role ?? "user" },
+    },
+    { upsert: true }
+  );
+}
+export async function getAdminByUsername(username: string) {
+  const c = await col("users");
+  return (await c?.findOne({ username, role: "admin" })) ?? null;
+}
+export async function ensureAdminAccount(
+  username: string,
+  passwordHash: string
+) {
+  const c = await col("users");
+  if (!c) return;
+  const now = new Date();
+  await c.updateOne(
+    { username },
+    {
+      $setOnInsert: {
+        username,
+        passwordHash,
+        role: "admin",
+        name: "Ramic Studio Admin",
+        openId: `admin:${username}`,
+        createdAt: now,
+        updatedAt: now,
+        lastSignedIn: now,
+      },
+    },
+    { upsert: true }
+  );
+}
+export async function listNotices() {
+  const c = await col("notices");
+  return c
+    ? (await c.find({}).sort({ publishedAt: -1 }).limit(100).toArray()).map(
+        normalizeNotice
+      )
+    : [];
+}
+export async function getNotice(idValue: string) {
+  const c = await col("notices");
+  const d = c
+    ? await c.findOne({
+        _id: ObjectId.isValid(idValue) ? new ObjectId(idValue) : idValue,
+      } as any)
+    : null;
+  return d ? normalizeNotice(d) : null;
+}
+export async function createNotice(input: InsertNotice) {
+  const c = await col("notices");
+  if (!c) return null;
+  const d = createNoticeDocument(input);
+  const r = await c.insertOne(d);
+  return normalizeNotice({ ...d, _id: r.insertedId });
+}
+function documentId(value: string) {
+  return ObjectId.isValid(value) ? new ObjectId(value) : value;
+}
+export async function updateNotice(idValue: string, input: InsertNotice) {
+  const c = await col("notices");
+  if (!c) return null;
+  const result = await c.findOneAndUpdate(
+    { _id: documentId(idValue) } as any,
+    {
+      $set: {
+        category: input.category,
+        title: input.title.trim(),
+        body: input.body.trim(),
+        coverUrl: input.coverUrl ?? null,
+        publishedAt: input.publishedAt ?? new Date(),
+        updatedAt: new Date(),
+      },
+    },
+    { returnDocument: "after" }
+  );
+  return result ? normalizeNotice(result) : null;
+}
+export async function deleteNotice(idValue: string) {
+  const c = await col("notices");
+  if (!c) return false;
+  return (
+    (await c.deleteOne({ _id: documentId(idValue) } as any)).deletedCount > 0
+  );
+}
+export async function listGames(protectPreview = false) {
+  const c = await col("games");
+  return c
+    ? (await c.find({}).sort({ createdAt: -1 }).toArray()).map(d =>
+        normalizeGame(d, protectPreview)
+      )
+    : [];
+}
+function singleGameMedia(input: Omit<Game, "id" | "createdAt" | "updatedAt">) {
+  return input.videoUrl
+    ? { ...input, imageUrl: "", videoUrl: input.videoUrl }
+    : { ...input, imageUrl: input.imageUrl ?? "", videoUrl: null };
+}
+export async function createGame(
+  input: Omit<Game, "id" | "createdAt" | "updatedAt">
+) {
+  const c = await col("games");
+  if (!c) return null;
+  const now = new Date();
+  const d = { ...singleGameMedia(input), createdAt: now, updatedAt: now };
+  const r = await c.insertOne(d);
+  return normalizeGame({ ...d, _id: r.insertedId });
+}
+export async function updateGame(
+  idValue: string,
+  input: Omit<Game, "id" | "createdAt" | "updatedAt">
+) {
+  const c = await col("games");
+  if (!c) return null;
+  const result = await c.findOneAndUpdate(
+    { _id: documentId(idValue) } as any,
+    { $set: { ...singleGameMedia(input), updatedAt: new Date() } },
+    { returnDocument: "after" }
+  );
+  return result ? normalizeGame(result) : null;
+}
+export async function deleteGame(idValue: string) {
+  const c = await col("games");
+  if (!c) return false;
+  return (
+    (await c.deleteOne({ _id: documentId(idValue) } as any)).deletedCount > 0
+  );
+}
+export async function listTeam() {
+  const c = await col("team");
+  return c
+    ? (
+        await c
+          .find({ isPublic: { $ne: false } })
+          .sort({ sortOrder: 1 })
+          .toArray()
+      ).map(normalizeTeam)
+    : [];
+}
+export async function createTeam(
+  input: Omit<TeamMember, "id" | "createdAt" | "updatedAt">
+) {
+  const c = await col("team");
+  if (!c) return null;
+  const now = new Date();
+  const d = { ...input, createdAt: now, updatedAt: now };
+  const r = await c.insertOne(d);
+  return normalizeTeam({ ...d, _id: r.insertedId });
+}
+export async function listAllTeam() {
+  const c = await col("team");
+  return c
+    ? (await c.find({}).sort({ sortOrder: 1, createdAt: 1 }).toArray()).map(
+        normalizeTeam
+      )
+    : [];
+}
+export async function updateTeam(
+  idValue: string,
+  input: Omit<TeamMember, "id" | "createdAt" | "updatedAt">
+) {
+  const c = await col("team");
+  if (!c) return null;
+  const result = await c.findOneAndUpdate(
+    { _id: documentId(idValue) } as any,
+    { $set: { ...input, updatedAt: new Date() } },
+    { returnDocument: "after" }
+  );
+  return result ? normalizeTeam(result) : null;
+}
+export async function deleteTeam(idValue: string) {
+  const c = await col("team");
+  if (!c) return false;
+  return (
+    (await c.deleteOne({ _id: documentId(idValue) } as any)).deletedCount > 0
+  );
+}
+function legacySocialLinks(d: AnyDoc | null | undefined): SocialLink[] {
+  return [
+    { label: "인스타그램", url: d?.instagramUrl ?? "" },
+    { label: "유튜브", url: d?.youtubeUrl ?? "" },
+    { label: "디스코드", url: d?.discordUrl ?? "" },
+    { label: "스팀", url: d?.steamUrl ?? "" },
+  ].filter(link => link.url);
+}
+export async function getSettings(): Promise<SiteSettings> {
+  const c = await col("settings");
+  const d = await c?.findOne({ _id: "site" } as any);
+  return {
+    id: "site",
+    logoUrl: d?.logoUrl ?? "/assets/RamicStudio.svg",
+    instagramUrl: d?.instagramUrl ?? "",
+    youtubeUrl: d?.youtubeUrl ?? "",
+    discordUrl: d?.discordUrl ?? "",
+    steamUrl: d?.steamUrl ?? "",
+    socialLinks: Array.isArray(d?.socialLinks)
+      ? d.socialLinks
+          .map((link: any) => ({
+            label: String(link.label ?? "").trim(),
+            url: String(link.url ?? "").trim(),
+          }))
+          .filter((link: SocialLink) => link.label && link.url)
+      : legacySocialLinks(d),
+    footerText: d?.footerText ?? "© 2026 RAMIC STUDIO. 호기심으로 만듭니다.",
+    updatedAt: date(d?.updatedAt ?? new Date()),
+  };
+}
+export async function saveSettings(input: Partial<SiteSettings>) {
+  const c = await col("settings");
+  if (!c) return getSettings();
+  const now = new Date();
+  await c.updateOne(
+    { _id: "site" } as any,
+    { $set: { ...input, updatedAt: now } },
+    { upsert: true }
+  );
+  return getSettings();
+}
+export async function addAdmin(
+  username: string,
+  passwordHash: string,
+  name: string
+) {
+  const c = await col("users");
+  if (!c) return;
+  const now = new Date();
+  await c.updateOne(
+    { username },
+    {
+      $set: { username, passwordHash, name, role: "admin", updatedAt: now },
+      $setOnInsert: {
+        openId: `admin:${username}`,
+        createdAt: now,
+        lastSignedIn: now,
+      },
+    },
+    { upsert: true }
+  );
+}
+export async function changeAdminPassword(
+  username: string,
+  passwordHash: string
+) {
+  const c = await col("users");
+  if (c)
+    await c.updateOne(
+      { username, role: "admin" },
+      { $set: { passwordHash, updatedAt: new Date() } }
+    );
+}
+export type SecurityEvent = {
+  event: string;
+  username?: string;
+  actor?: string;
+  ip?: string;
+  userAgent?: string;
+  path?: string;
+  detail?: string;
+  createdAt: Date;
+};
+export async function writeSecurityLog(
+  input: Omit<SecurityEvent, "createdAt">
+) {
+  const c = await col("security_logs");
+  if (!c) return;
+  await c.insertOne({ ...input, createdAt: new Date() });
+}
+export async function listSecurityLogs(limit = 100) {
+  const c = await col("security_logs");
+  if (!c) return [];
+  return (
+    await c
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(Math.min(limit, 200))
+      .toArray()
+  ).map(d => ({
+    id: id(d),
+    event: String(d.event ?? "unknown"),
+    username: d.username ?? "",
+    actor: d.actor ?? "",
+    ip: d.ip ?? "",
+    userAgent: d.userAgent ?? "",
+    path: d.path ?? "",
+    detail: d.detail ?? "",
+    createdAt: date(d.createdAt),
+  }));
+}

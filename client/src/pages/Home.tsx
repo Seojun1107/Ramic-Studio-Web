@@ -87,18 +87,26 @@ export default function Home() {
   const { data: noticeData } = trpc.news.list.useQuery();
   const { data: teamData } = trpc.site.team.useQuery();
   const { data: siteSettings } = trpc.site.settings.useQuery();
+  const footerSocials =
+    siteSettings?.socialLinks ??
+    [
+      ["인스타그램", siteSettings?.instagramUrl],
+      ["유튜브", siteSettings?.youtubeUrl],
+      ["디스코드", siteSettings?.discordUrl],
+      ["스팀", siteSettings?.steamUrl],
+    ]
+      .filter(([, url]) => url)
+      .map(([label, url]) => ({ label, url: String(url) }));
   const games = gameData ?? [];
-  const notices = (noticeData ?? [])
-    .slice(0, 3)
-    .map(notice => ({
-      date: new Date(notice.publishedAt)
-        .toISOString()
-        .slice(0, 10)
-        .replaceAll("-", "."),
-      tag: notice.category,
-      title: notice.title,
-      id: notice.id,
-    }));
+  const notices = (noticeData ?? []).slice(0, 3).map(notice => ({
+    date: new Date(notice.publishedAt)
+      .toISOString()
+      .slice(0, 10)
+      .replaceAll("-", "."),
+    tag: notice.category,
+    title: notice.title,
+    id: notice.id,
+  }));
   const team = teamData ?? [];
   const selected = games[activeGame] ?? games[0];
   useEffect(() => {
@@ -256,16 +264,24 @@ export default function Home() {
               <aside className="game-feature-info">
                 <div className="game-feature-info-top">
                   <span>{selected.genre || "GAME"}</span>
-                  <span>{String(activeGame + 1).padStart(2, "0")} / {String(games.length).padStart(2, "0")}</span>
+                  <span>
+                    {String(activeGame + 1).padStart(2, "0")} /{" "}
+                    {String(games.length).padStart(2, "0")}
+                  </span>
                 </div>
                 <h3>{selected.title}</h3>
-                <p>{selected.description || "라믹 스튜디오가 준비 중인 새로운 세계입니다."}</p>
+                <p>
+                  {selected.description ||
+                    "라믹 스튜디오가 준비 중인 새로운 세계입니다."}
+                </p>
                 <div className="game-feature-meta">
                   <span>{selected.code}</span>
                   <span>{selected.status}</span>
                 </div>
                 <GameActions game={selected} />
-                <span className="game-feature-hint">목록에서 다른 세계를 선택하세요 <ArrowUpRight size={14} /></span>
+                <span className="game-feature-hint">
+                  목록에서 다른 세계를 선택하세요 <ArrowUpRight size={14} />
+                </span>
               </aside>
               <div className="game-list">
                 {games.map((game, index) => (
@@ -436,12 +452,20 @@ export default function Home() {
           />
         </a>
         <span className="footer-copy">
-          © 2026 RAMIC STUDIO. 호기심으로 만듭니다.
+          {siteSettings?.footerText ||
+            "© 2026 RAMIC STUDIO. 호기심으로 만듭니다."}
         </span>
         <div className="footer-links">
-          <a href="#contact">인스타그램</a>
-          <a href="#contact">디스코드</a>
-          <a href="#contact">프레스킷</a>
+          {footerSocials.map(link => (
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              key={`${link.label}-${link.url}`}
+            >
+              {link.label}
+            </a>
+          ))}
         </div>
       </footer>
     </div>
