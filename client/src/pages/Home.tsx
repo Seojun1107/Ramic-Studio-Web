@@ -1,33 +1,31 @@
-import { useAuth } from "@/_core/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { Streamdown } from 'streamdown';
+import { useEffect, useState } from "react";
+import { ArrowUpRight, ChevronDown, Disc3, Menu, MousePointer2, Play, Sparkles, X } from "lucide-react";
+import { Link } from "wouter";
+import { trpc } from "@/lib/trpc";
 
-/**
- * All content in this page are only for example, replace with your own feature implementation
- * When building pages, remember your instructions in Frontend Workflow, Frontend Best Practices, Design Guide and Common Pitfalls
- */
+const asset = "https://raw.githubusercontent.com/Seojun1107/Ramic-Studio-Web/main/src/images/";
+const games = [
+  { code: "R-01", title: "PROJECT GENESIS", meta: "액션 어드벤처 · PC / Console", image: `${asset}hama.png` },
+  { code: "R-02", title: "DUNGEON RUNNER", meta: "던전 러너 · 개발 중", image: `${asset}runner.png` },
+  { code: "R-03", title: "HACK.ING", meta: "실험적 인터랙티브 · 2027", image: `${asset}hacking.jpeg` },
+];
+const fallbackNotices = [
+  { id: 1, category: "STUDIO", title: "라믹 스튜디오가 새로운 세계를 만들기 시작했습니다.", body: "", publishedAt: new Date("2026-09-18") },
+  { id: 2, category: "NEON VEIL", title: "첫 번째 신호를 공개합니다.", body: "", publishedAt: new Date("2026-08-29") },
+  { id: 3, category: "CAREERS", title: "함께 미지의 세계를 만들 동료를 찾습니다.", body: "", publishedAt: new Date("2026-07-11") },
+];
+function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) { return <div className={`reveal ${className}`} style={{ animationDelay: `${delay}ms` }}>{children}</div>; }
+
 export default function Home() {
-  // The useAuth hook provides authentication state.
-  // To implement login/logout, call logout(), or start login from an event
-  // handler: onClick={() => startLogin()} (imported from "@/const"). Never call
-  // startLogin() during render (no href={startLogin()}) — it mints a one-time
-  // nonce cookie and must run only at the moment of navigation.
-  let { user, loading, error, isAuthenticated, logout } = useAuth();
-
-  // If theme is switchable in App.tsx, we can implement theme toggling like this:
-  // const { theme, toggleTheme } = useTheme();
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <main>
-        {/* Example: lucide-react for icons */}
-        <Loader2 className="animate-spin" />
-        Example Page
-        {/* Example: Streamdown for markdown rendering */}
-        <Streamdown>Any **markdown** content</Streamdown>
-        <Button variant="default">Example Button</Button>
-      </main>
-    </div>
-  );
+  const [menuOpen, setMenuOpen] = useState(false); const [cursor, setCursor] = useState({ x: 0, y: 0 }); const [activeGame, setActiveGame] = useState(0);
+  const { data: noticeData } = trpc.news.list.useQuery();
+  const notices = (noticeData?.length ? noticeData : fallbackNotices).slice(0, 3).map((notice) => ({ date: new Date(notice.publishedAt).toISOString().slice(0, 10).replaceAll("-", "."), tag: notice.category, title: notice.title }));
+  useEffect(() => { const onMove = (event: MouseEvent) => setCursor({ x: (event.clientX / window.innerWidth - .5) * 2, y: (event.clientY / window.innerHeight - .5) * 2 }); window.addEventListener("mousemove", onMove); return () => window.removeEventListener("mousemove", onMove); }, []);
+  return <div className="studio-site"><div className="noise" aria-hidden="true" /><header className="site-header"><a className="brand" href="#top" aria-label="라믹 스튜디오 홈"><span className="brand-mark">R</span><span>RAMIC<br /><small>STUDIO</small></span></a><nav className={`main-nav ${menuOpen ? "is-open" : ""}`} aria-label="주요 메뉴"><a href="#games" onClick={() => setMenuOpen(false)}>게임</a><a href="#studio" onClick={() => setMenuOpen(false)}>스튜디오</a><Link href="/news" onClick={() => setMenuOpen(false)}>공지사항</Link><a href="#team" onClick={() => setMenuOpen(false)}>팀</a></nav><div className="header-actions"><span className="status-dot" /><span className="status-copy">서울 / 온라인</span><button className="icon-button menu-toggle" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? "메뉴 닫기" : "메뉴 열기"}>{menuOpen ? <X /> : <Menu />}</button></div></header>
+    <main id="top"><section className="hero" style={{ "--mx": `${cursor.x * 18}px`, "--my": `${cursor.y * 18}px` } as React.CSSProperties}><div className="hero-grid" /><div className="hero-meta"><span>EST. 2021</span><span>SEOUL · KR</span></div><div className="hero-copy"><Reveal><p className="eyebrow"><Sparkles size={14} /> 이야기에 신호를 더하다</p></Reveal><Reveal delay={80}><h1>세계를<br /><em>만들고</em><br />마음을<br />움직입니다.</h1></Reveal><Reveal delay={170}><p className="hero-lede">라믹 스튜디오는 호기심 많은 사람들을 위해 낯설고 아름다운 세계를 만드는 게임 스튜디오입니다.</p></Reveal><Reveal delay={240}><a className="pill-button" href="#games">우리의 세계 탐험하기 <ArrowUpRight size={16} /></a></Reveal></div><div className="hero-art" aria-label="라믹 스튜디오 추상 아트"><div className="art-ring ring-a" /><div className="art-ring ring-b" /><div className="art-core" /><div className="art-figure" style={{ transform: `translate3d(var(--mx), var(--my), 0)` }} /><span className="art-caption">NO. 001 / 첫 번째 신호</span></div><div className="hero-bottom"><span className="scroll-label"><MousePointer2 size={14} /> 스크롤하여 입장</span><span className="hero-index">01 <span>/ 04</span></span><ChevronDown className="bounce" /></div></section>
+      <section className="signal-strip"><div><span className="mono">현재 방송 중</span><strong>PROJECT GENESIS <i>—</i> 첫 번째 공개</strong></div><a href="#games">트레일러 보기 <Play size={13} fill="currentColor" /></a></section>
+      <section className="section games-section" id="games"><div className="section-heading"><div><p className="eyebrow">01 / 우리가 만드는 세계</p><h2>미지를<br /><em>플레이하다.</em></h2></div><p className="section-note">새로운 도시와 불가능한 행성까지, 오래 기억될 게임을 만듭니다.</p></div><div className="game-stage"><div className="game-feature-image" style={{ backgroundImage: `url(${games[activeGame].image})` }}><div className="game-overlay" /><span className="feature-code">{games[activeGame].code}</span><span className="feature-status">개발 진행 중 <i /></span><div className="feature-title"><span>PROJECT</span><h3>{games[activeGame].title}</h3><p>{games[activeGame].meta}</p></div><button className="play-button" aria-label="트레일러 재생"><Play fill="currentColor" size={22} /></button></div><div className="game-list">{games.map((game, index) => <button className={`game-row ${activeGame === index ? "active" : ""}`} key={game.code} onClick={() => setActiveGame(index)}><span>{game.code}</span><strong>{game.title}</strong><span className="row-meta">{game.meta}</span><ArrowUpRight size={17} /></button>)}<div className="game-list-foot"><Disc3 size={18} /><span>3개의 세계가 궤도에 있습니다</span><span className="line" /></div></div></div></section>
+      <section className="manifesto" id="studio"><div className="manifesto-orbit" /><div className="manifesto-inner"><p className="eyebrow">02 / 스튜디오</p><h2>감정을<br /><span>플레이</span>할 수<br />있게.</h2><p className="manifesto-copy">좋은 게임은 목적지가 아니라 더 큰 삶으로 통하는 작은 문입니다. 우리는 배려와 호기심, 그리고 조금의 아름다운 이상함으로 그 문을 만듭니다.</p><a className="text-link" href="#team">팀 만나보기 <ArrowUpRight size={16} /></a></div><div className="manifesto-stamp">PLAY<br />CURIOUS<br /><span>◎</span></div></section>
+      <section className="section team-section" id="team"><div className="section-heading"><div><p className="eyebrow">03 / 팀</p><h2>사람이<br /><em>세계가 됩니다.</em></h2></div><p className="section-note">각자의 시선과 기술이 모여 라믹의 세계를 만듭니다.</p></div><div className="team-card"><img src={`${asset}hakjo.jpg`} alt="라믹 스튜디오 팀원" /><div className="team-copy"><span className="news-tag">TEAM / 001</span><h3>함께 만드는 사람들</h3><p>기획, 아트, 프로그래밍, 사운드. 서로 다른 언어를 가진 사람들이 하나의 세계를 향해 작업합니다.</p><span className="team-caption">라믹 스튜디오 팀원</span></div></div></section>
+      <section className="section news-section" id="news"><div className="section-heading"><div><p className="eyebrow">04 / 최신 소식</p><h2>현장에서<br /><em>전합니다.</em></h2></div><Link className="text-link" href="/news">공지사항 전체 보기 <ArrowUpRight size={16} /></Link></div><div className="news-grid">{notices.map((notice, index) => <Link href="/news" className={`news-card card-${index}`} key={notice.date}><span className="news-date">{notice.date}</span><span className="news-tag">{notice.tag}</span><h3>{notice.title}</h3><span className="news-arrow"><ArrowUpRight size={18} /></span></Link>)}</div></section><section className="contact-section" id="contact"><div className="contact-glow" /><p className="eyebrow">05 / 소식 받기</p><h2>계속<br /><em>궁금해 주세요.</em></h2><p>새로운 세계와 스튜디오 소식을 가끔 보내드립니다.</p><form className="signup" onSubmit={(event) => event.preventDefault()}><label className="sr-only" htmlFor="email">이메일 주소</label><input id="email" type="email" placeholder="your@email.com" required /><button type="submit">구독하기 <ArrowUpRight size={16} /></button></form></section></main><footer className="site-footer"><a className="brand" href="#top"><span className="brand-mark">R</span><span>RAMIC<br /><small>STUDIO</small></span></a><span className="footer-copy">© 2026 RAMIC STUDIO. 호기심으로 만듭니다.</span><div className="footer-links"><a href="#contact">인스타그램</a><a href="#contact">디스코드</a><a href="#contact">프레스킷</a></div></footer></div>;
 }
