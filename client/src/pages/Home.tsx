@@ -252,33 +252,21 @@ export default function Home() {
                 <span className="feature-status">
                   {selected.status} <i />
                 </span>
-                <div className="feature-title">
-                  <span>{selected.genre || "GAME"}</span>
-                  <h3>{selected.title}</h3>
-                  <p>{selected.description}</p>
-                  <GameActions game={selected} />
-                </div>
-                {selected.externalUrl || selected.previewUrl ? (
-                  <a
-                    className="play-button"
-                    href={
-                      selected.externalUrl ?? selected.previewUrl ?? undefined
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={
-                      selected.previewUrl && !selected.externalUrl
-                        ? "웹 체험판 실행"
-                        : "게임 페이지 열기"
-                    }
-                  ></a>
-                ) : (
-                  <span
-                    className="play-button play-button-disabled"
-                    aria-label="등록된 플레이 링크 없음"
-                  ></span>
-                )}
               </div>
+              <aside className="game-feature-info">
+                <div className="game-feature-info-top">
+                  <span>{selected.genre || "GAME"}</span>
+                  <span>{String(activeGame + 1).padStart(2, "0")} / {String(games.length).padStart(2, "0")}</span>
+                </div>
+                <h3>{selected.title}</h3>
+                <p>{selected.description || "라믹 스튜디오가 준비 중인 새로운 세계입니다."}</p>
+                <div className="game-feature-meta">
+                  <span>{selected.code}</span>
+                  <span>{selected.status}</span>
+                </div>
+                <GameActions game={selected} />
+                <span className="game-feature-hint">목록에서 다른 세계를 선택하세요 <ArrowUpRight size={14} /></span>
+              </aside>
               <div className="game-list">
                 {games.map((game, index) => (
                   <button
