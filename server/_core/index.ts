@@ -2,6 +2,14 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
+import fs from "fs/promises";
+import os from "os";
+import { randomUUID } from "crypto";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import { getAdminFromRequest } from "./adminAuth";
+const execFileAsync = promisify(execFile);
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
@@ -38,6 +46,20 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerAdminAuthRoutes(app);
+  app.post("/api/admin/upload-preview", async (req, res) => {
+    const admin = await getAdminFromRequest(req);
+    if (!admin) { res.status(401).json({ message: "관리자 로그인이 필요합니다." }); return; }
+    const zipBase64 = typeof req.body?.zipBase64 === "string" ? req.body.zipBase64 : "";
+    if (!zipBase64 || zipBase64.length > 70_000_000) { res.status(400).json({ message: "ZIP 파일은 50MB 이하만 업로드할 수 있습니다." }); return; }
+    const temp = path.join(os.tmpdir(), `ramic-${randomUUID()}.zip`); const slug = randomUUID(); const target = path.resolve(process.cwd(), "client/public/uploads/previews", slug);
+    try {
+      const raw = zipBase64.replace(/^data:application\/zip;base64,/, ""); await fs.mkdir(target, { recursive: true }); await fs.writeFile(temp, Buffer.from(raw, "base64"));
+      const listing = (await execFileAsync("unzip", ["-Z1", temp])).stdout.split(/\r?\n/).filter(Boolean);
+      if (listing.some(name => path.isAbsolute(name) || name.split(/[\\/]/).includes(".."))) throw new Error("unsafe archive");
+      await execFileAsync("unzip", ["-q", temp, "-d", target]);
+      res.json({ previewUrl: `/uploads/previews/${slug}/index.html` });
+    } catch { await fs.rm(target, { recursive: true, force: true }); res.status(400).json({ message: "안전한 웹게임 ZIP만 업로드할 수 있습니다." }); } finally { await fs.rm(temp, { force: true }); }
+  });
   await bootstrapAdmin();
   // tRPC API
   app.use(
