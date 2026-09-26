@@ -2,5 +2,121 @@ import { ArrowLeft, ArrowUpRight, Bell, Filter } from "lucide-react";
 import { Link } from "wouter";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-const labels: Record<string, string> = { STUDIO: "스튜디오", GAME: "게임", PROJECT: "프로젝트", CAREERS: "채용", COMMUNITY: "커뮤니티" }; const accents = ["lime", "coral", "violet", "lime"];
-export default function News() { const [filter, setFilter] = useState("ALL"); const { data, isLoading } = trpc.news.list.useQuery(); const items = (data ?? []).map((item, index) => ({ ...item, accent: accents[index % accents.length] })); const filters = ["ALL", ...Array.from(new Set(items.map(item => item.category)))]; const visible = filter === "ALL" ? items : items.filter(item => item.category === filter); return <div className="studio-site news-page"><header className="site-header"><Link className="brand" href="/"><img src="/assets/RamicStudio.svg" alt="Ramic Studio" /></Link><div className="header-actions"><span className="status-dot" /><span className="status-copy">서울 / 온라인</span></div></header><main className="news-main"><Link href="/" className="back-link"><ArrowLeft size={15} /> 스튜디오로 돌아가기</Link><div className="news-hero"><div><p className="eyebrow"><Bell size={14} /> 공지사항 / ARCHIVE</p><h1>신호<br /><em>기록</em><br />보관소.</h1></div><p>라믹 스튜디오의 공지, 현장 기록, 그리고 우리가 만드는 세계의 조각을 전합니다.</p></div><div className="filter-bar"><Filter size={15} />{filters.map(option => <button key={option} onClick={() => setFilter(option)} className={filter === option ? "active" : ""}>{option === "ALL" ? "전체" : labels[option] ?? option}</button>)}<Link href="/admin" className="admin-link">관리자 <ArrowUpRight size={14} /></Link></div><div className="news-list">{isLoading ? <p className="empty-state">공지사항을 불러오는 중...</p> : visible.length ? visible.map(item => <Link href={`/news/${item.id}`} className={`news-item ${item.accent}`} key={item.id}><span className="news-date">{new Date(item.publishedAt).toISOString().slice(0, 10).replaceAll("-", ".")}</span><div><span className="news-tag">{labels[item.category] ?? item.category}</span><h2>{item.title}</h2><p>{item.body.replace(/[#*!\[\]()]/g, "").slice(0, 140)}</p></div><ArrowUpRight className="news-item-arrow" /></Link>) : <p className="empty-state">아직 공개된 공지사항이 없습니다.</p>}</div></main><footer className="site-footer"><Link className="brand" href="/"><img src="/assets/RamicStudio.svg" alt="Ramic Studio" /></Link><span className="footer-copy">© 2026 RAMIC STUDIO. 호기심으로 만듭니다.</span></footer></div>; }
+const labels: Record<string, string> = {
+  STUDIO: "스튜디오",
+  GAME: "게임",
+  PROJECT: "프로젝트",
+  CAREERS: "채용",
+  COMMUNITY: "커뮤니티",
+};
+const accents = ["lime", "coral", "violet", "lime"];
+export default function News() {
+  const [filter, setFilter] = useState("ALL");
+  const { data, isLoading } = trpc.news.list.useQuery();
+  const { data: siteSettings } = trpc.site.settings.useQuery();
+  const items = (data ?? []).map((item, index) => ({
+    ...item,
+    accent: accents[index % accents.length],
+  }));
+  const filters = [
+    "ALL",
+    ...Array.from(new Set(items.map(item => item.category))),
+  ];
+  const visible =
+    filter === "ALL" ? items : items.filter(item => item.category === filter);
+  return (
+    <div className="studio-site news-page">
+      <header className="site-header">
+        <Link className="brand" href="/">
+          <img
+            src={siteSettings?.logoUrl || "/assets/RamicStudio.svg"}
+            alt="Ramic Studio"
+          />
+        </Link>
+        <div className="header-actions">
+          <span className="status-dot" />
+          <span className="status-copy">서울 / 온라인</span>
+        </div>
+      </header>
+      <main className="news-main">
+        <Link href="/" className="back-link">
+          <ArrowLeft size={15} /> 스튜디오로 돌아가기
+        </Link>
+        <div className="news-hero">
+          <div>
+            <p className="eyebrow">
+              <Bell size={14} /> 공지사항 / ARCHIVE
+            </p>
+            <h1>
+              신호
+              <br />
+              <em>기록</em>
+              <br />
+              보관소.
+            </h1>
+          </div>
+          <p>
+            라믹 스튜디오의 공지, 현장 기록, 그리고 우리가 만드는 세계의 조각을
+            전합니다.
+          </p>
+        </div>
+        <div className="filter-bar">
+          <Filter size={15} />
+          {filters.map(option => (
+            <button
+              key={option}
+              onClick={() => setFilter(option)}
+              className={filter === option ? "active" : ""}
+            >
+              {option === "ALL" ? "전체" : (labels[option] ?? option)}
+            </button>
+          ))}
+          <Link href="/admin" className="admin-link">
+            관리자 <ArrowUpRight size={14} />
+          </Link>
+        </div>
+        <div className="news-list">
+          {isLoading ? (
+            <p className="empty-state">공지사항을 불러오는 중...</p>
+          ) : visible.length ? (
+            visible.map(item => (
+              <Link
+                href={`/news/${item.id}`}
+                className={`news-item ${item.accent}`}
+                key={item.id}
+              >
+                <span className="news-date">
+                  {new Date(item.publishedAt)
+                    .toISOString()
+                    .slice(0, 10)
+                    .replaceAll("-", ".")}
+                </span>
+                <div>
+                  <span className="news-tag">
+                    {labels[item.category] ?? item.category}
+                  </span>
+                  <h2>{item.title}</h2>
+                  <p>{item.body.replace(/[#*!\[\]()]/g, "").slice(0, 140)}</p>
+                </div>
+                <ArrowUpRight className="news-item-arrow" />
+              </Link>
+            ))
+          ) : (
+            <p className="empty-state">아직 공개된 공지사항이 없습니다.</p>
+          )}
+        </div>
+      </main>
+      <footer className="site-footer">
+        <Link className="brand" href="/">
+          <img
+            src={siteSettings?.logoUrl || "/assets/RamicStudio.svg"}
+            alt="Ramic Studio"
+          />
+        </Link>
+        <span className="footer-copy">
+          © 2026 RAMIC STUDIO. 호기심으로 만듭니다.
+        </span>
+      </footer>
+    </div>
+  );
+}
