@@ -49,6 +49,8 @@ async function startServer() {
   registerAdminAuthRoutes(app);
   app.get("/api/admin/deploy/status", async (req, res) => {
     if (!(await getAdminFromRequest(req))) { res.status(401).json({ message: "관리자 로그인이 필요합니다." }); return; }
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
     res.json(await getDeployStatus());
   });
   app.post("/api/admin/deploy/update", async (req, res) => {

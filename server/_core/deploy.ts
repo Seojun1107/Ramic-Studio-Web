@@ -54,7 +54,8 @@ async function localSha() {
 
 async function remoteSha() {
   const response = await fetch(`https://api.github.com/repos/${repo}/commits/${encodeURIComponent(branch)}`, {
-    headers: { Accept: "application/vnd.github+json", ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) },
+    cache: "no-store",
+    headers: { Accept: "application/vnd.github+json", "Cache-Control": "no-cache", ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) },
   });
   if (!response.ok) throw new Error(`GitHub 커밋 조회 실패 (${response.status})`);
   const data = (await response.json()) as { sha?: string };
