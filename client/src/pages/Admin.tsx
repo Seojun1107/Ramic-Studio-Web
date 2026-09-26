@@ -43,6 +43,7 @@ const emptyNotice = {
   body: "",
   discordNotify: false,
   discordMentionEveryone: false,
+  discordMode: "same" as "same" | "custom",
   discordBody: "",
 };
 const emptyMember = {
@@ -768,6 +769,7 @@ export default function Admin() {
                               body: item.body,
                               discordNotify: false,
                               discordMentionEveryone: false,
+                              discordMode: "same",
                               discordBody: "",
                             });
                             window.scrollTo({ top: 0, behavior: "smooth" });
@@ -893,6 +895,21 @@ export default function Admin() {
                   </label>
                   {notice.discordNotify && (
                     <>
+                      <label>
+                        Discord 전송 내용
+                        <select
+                          value={notice.discordMode}
+                          onChange={e =>
+                            setNotice({
+                              ...notice,
+                              discordMode: e.target.value as "same" | "custom",
+                            })
+                          }
+                        >
+                          <option value="same">웹 공지 그대로 보내기</option>
+                          <option value="custom">Discord 전용 문구 사용</option>
+                        </select>
+                      </label>
                       <label className="check-row">
                         <input
                           type="checkbox"
@@ -906,17 +923,20 @@ export default function Admin() {
                         />
                         맨 위에 @everyone 추가
                       </label>
-                      <label>
-                        Discord용 공지 문구 (선택)
-                        <textarea
-                          rows={6}
-                          value={notice.discordBody}
-                          onChange={e =>
-                            setNotice({ ...notice, discordBody: e.target.value })
-                          }
-                          placeholder="비워두면 웹 공지의 제목과 본문을 그대로 전송합니다."
-                        />
-                      </label>
+                      {notice.discordMode === "custom" && (
+                        <label>
+                          Discord용 공지 문구
+                          <textarea
+                            rows={6}
+                            value={notice.discordBody}
+                            onChange={e =>
+                              setNotice({ ...notice, discordBody: e.target.value })
+                            }
+                            placeholder="Discord에만 보낼 문구를 입력하세요."
+                            required
+                          />
+                        </label>
+                      )}
                     </>
                   )}
                 </fieldset>

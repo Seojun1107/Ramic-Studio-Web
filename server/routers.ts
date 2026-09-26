@@ -46,6 +46,7 @@ const noticeInput = z.object({
   publishedAt: z.date().optional(),
   discordNotify: z.boolean().default(false),
   discordMentionEveryone: z.boolean().default(false),
+  discordMode: z.enum(["same", "custom"]).default("same"),
   discordBody: z.string().max(100000).optional(),
 });
 export const appRouter = router({
@@ -71,7 +72,7 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .query(({ input }) => getNotice(input.id)),
     publish: adminProcedure.input(noticeInput).mutation(async ({ input }) => {
-      const { discordNotify, discordMentionEveryone, discordBody, ...notice } = input;
+      const { discordNotify, discordMentionEveryone, discordMode, discordBody, ...notice } = input;
       const created = await createNotice({
         ...notice,
         publishedAt: notice.publishedAt ?? new Date(),
@@ -86,7 +87,7 @@ export const appRouter = router({
             title: created.title,
             body: created.body,
             mentionEveryone: discordMentionEveryone,
-            customBody: discordBody,
+            customBody: discordMode === "custom" ? discordBody : undefined,
           })
         : {
             sent: false as const,
@@ -98,7 +99,7 @@ export const appRouter = router({
     update: adminProcedure
       .input(noticeInput.extend({ id: z.string() }))
       .mutation(async ({ input }) => {
-        const { id, discordNotify, discordMentionEveryone, discordBody, ...notice } = input;
+        const { id, discordNotify, discordMentionEveryone, discordMode, discordBody, ...notice } = input;
         const updated = await updateNotice(id, notice);
         if (!updated)
           return {
@@ -110,7 +111,7 @@ export const appRouter = router({
               title: updated.title,
               body: updated.body,
               mentionEveryone: discordMentionEveryone,
-              customBody: discordBody,
+              customBody: discordMode === "custom" ? discordBody : undefined,
             })
           : {
               sent: false as const,
