@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowUpRight, ChevronDown, Disc3, Menu, MousePointer2, Play, Sparkles, X } from "lucide-react";
 import { Link } from "wouter";
+import { trpc } from "@/lib/trpc";
 
 const asset = "https://raw.githubusercontent.com/Seojun1107/Ramic-Studio-Web/main/src/images/";
 const games = [
@@ -8,7 +9,7 @@ const games = [
   { code: "R-02", title: "DUNGEON RUNNER", meta: "던전 러너 · 개발 중", image: `${asset}runner.png` },
   { code: "R-03", title: "HACK.ING", meta: "실험적 인터랙티브 · 2027", image: `${asset}hacking.jpeg` },
 ];
-const notices = [
+const fallbackNotices = [
   { date: "2026.09.18", tag: "스튜디오", title: "라믹 스튜디오가 새로운 세계를 만들기 시작했습니다." },
   { date: "2026.08.29", tag: "PROJECT GENESIS", title: "첫 번째 신호를 공개합니다." },
   { date: "2026.07.11", tag: "채용", title: "함께 미지의 세계를 만들 동료를 찾습니다." },
@@ -17,6 +18,8 @@ function Reveal({ children, className = "", delay = 0 }: { children: React.React
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false); const [cursor, setCursor] = useState({ x: 0, y: 0 }); const [activeGame, setActiveGame] = useState(0);
+  const { data: noticeData } = trpc.news.list.useQuery();
+  const notices = (noticeData?.length ? noticeData : fallbackNotices).slice(0, 3).map((notice) => ({ date: new Date(notice.publishedAt).toISOString().slice(0, 10).replaceAll("-", "."), tag: notice.category, title: notice.title }));
   useEffect(() => { const onMove = (event: MouseEvent) => setCursor({ x: (event.clientX / window.innerWidth - .5) * 2, y: (event.clientY / window.innerHeight - .5) * 2 }); window.addEventListener("mousemove", onMove); return () => window.removeEventListener("mousemove", onMove); }, []);
   return <div className="studio-site"><div className="noise" aria-hidden="true" /><header className="site-header"><a className="brand" href="#top" aria-label="라믹 스튜디오 홈"><span className="brand-mark">R</span><span>RAMIC<br /><small>STUDIO</small></span></a><nav className={`main-nav ${menuOpen ? "is-open" : ""}`} aria-label="주요 메뉴"><a href="#games" onClick={() => setMenuOpen(false)}>게임</a><a href="#studio" onClick={() => setMenuOpen(false)}>스튜디오</a><Link href="/news" onClick={() => setMenuOpen(false)}>공지사항</Link><a href="#team" onClick={() => setMenuOpen(false)}>팀</a></nav><div className="header-actions"><span className="status-dot" /><span className="status-copy">서울 / 온라인</span><button className="icon-button menu-toggle" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? "메뉴 닫기" : "메뉴 열기"}>{menuOpen ? <X /> : <Menu />}</button></div></header>
     <main id="top"><section className="hero" style={{ "--mx": `${cursor.x * 18}px`, "--my": `${cursor.y * 18}px` } as React.CSSProperties}><div className="hero-grid" /><div className="hero-meta"><span>EST. 2021</span><span>SEOUL · KR</span></div><div className="hero-copy"><Reveal><p className="eyebrow"><Sparkles size={14} /> 이야기에 신호를 더하다</p></Reveal><Reveal delay={80}><h1>세계를<br /><em>만들고</em><br />마음을<br />움직입니다.</h1></Reveal><Reveal delay={170}><p className="hero-lede">라믹 스튜디오는 호기심 많은 사람들을 위해 낯설고 아름다운 세계를 만드는 게임 스튜디오입니다.</p></Reveal><Reveal delay={240}><a className="pill-button" href="#games">우리의 세계 탐험하기 <ArrowUpRight size={16} /></a></Reveal></div><div className="hero-art" aria-label="라믹 스튜디오 추상 아트"><div className="art-ring ring-a" /><div className="art-ring ring-b" /><div className="art-core" /><div className="art-figure" style={{ transform: `translate3d(var(--mx), var(--my), 0)` }} /><span className="art-caption">NO. 001 / 첫 번째 신호</span></div><div className="hero-bottom"><span className="scroll-label"><MousePointer2 size={14} /> 스크롤하여 입장</span><span className="hero-index">01 <span>/ 04</span></span><ChevronDown className="bounce" /></div></section>
