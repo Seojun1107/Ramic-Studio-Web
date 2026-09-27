@@ -16,16 +16,23 @@ async function subscribersCollection() {
 
 async function saveSubscription(email: string, unsubscribeTokenHash: string) {
   const c = await subscribersCollection();
-  if (!c) return { success: false, active: false, created: false } as const;
+  if (!c) return { success: false, active: false, created: false, welcomePending: false } as const;
   const existing = await c.findOne({ email });
-  if (existing?.active === true) return { success: true, active: true, created: false } as const;
+  if (existing?.active === true)
+    return { success: true, active: true, created: false, welcomePending: !existing.welcomeSentAt } as const;
   const now = new Date();
   await c.updateOne(
     { email },
     { $set: { email, active: true, unsubscribeTokenHash, updatedAt: now }, $setOnInsert: { createdAt: now } },
     { upsert: true }
   );
-  return { success: true, active: true, created: !existing } as const;
+  return { success: true, active: true, created: !existing, welcomePending: true } as const;
+}
+
+async function markWelcomeSent(email: string) {
+  const c = await subscribersCollection();
+  if (!c) return;
+  await c.updateOne({ email }, { $set: { welcomeSentAt: new Date(), updatedAt: new Date() } });
 }
 
 async function disableSubscription(unsubscribeTokenHash: string) {
@@ -113,10 +120,58 @@ async function sendEmail(to: string, subject: string, html: string, idempotencyK
   return { sent: true, skipped: false, message: "전송 완료" };
 }
 
+async function sendWelcomeEmail(email: string) {
+  const unsubscribeUrl = publicUrl(`/api/newsletter/unsubscribe?token=${tokenForEmail(email)}`);
+  const html = `<!doctype html>
+<html lang="ko">
+  <body style="margin:0;background:#f1f0ec;color:#171717;font-family:Arial,'Noto Sans KR',sans-serif;">
+    <div style="max-width:680px;margin:0 auto;padding:28px 18px 44px;">
+      <div style="padding:12px 4px 24px;font-size:11px;letter-spacing:.22em;color:#777;text-transform:uppercase;">
+        RAMIC STUDIO / WELCOME
+      </div>
+      <div style="overflow:hidden;background:#161616;border-radius:22px 22px 0 0;color:#fff;">
+        <div style="padding:48px 38px 52px;background:linear-gradient(135deg,#171717 0%,#292929 100%);">
+          <div style="font-size:11px;letter-spacing:.18em;color:#b8b8b8;text-transform:uppercase;margin-bottom:34px;">새로운 세계를 만드는 스튜디오</div>
+          <h1 style="font-size:38px;line-height:1.15;font-weight:500;letter-spacing:-.04em;margin:0 0 20px;">구독해 주셔서<br /><em style="font-style:normal;color:#d8ff61;">고맙습니다.</em></h1>
+          <p style="max-width:430px;color:#d2d2d2;font-size:15px;line-height:1.8;margin:0;">라믹 스튜디오의 새로운 소식과 우리가 만드는 세계의 다음 장면을 가장 먼저 전해드릴게요.</p>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #e4e1da;border-top:0;border-radius:0 0 22px 22px;padding:34px 38px 32px;">
+        <div style="font-size:12px;letter-spacing:.14em;color:#777;text-transform:uppercase;margin-bottom:14px;">A NOTE FROM RAMIC STUDIO</div>
+        <p style="font-size:16px;line-height:1.9;margin:0 0 20px;color:#333;">안녕하세요. 라믹 스튜디오입니다.</p>
+        <p style="font-size:15px;line-height:1.9;margin:0;color:#555;">구독을 통해 함께해 주셔서 감사합니다. 완성해 가는 게임과 프로젝트, 스튜디오의 작은 순간까지 정성껏 담아 보내드리겠습니다.</p>
+        <div style="height:1px;background:#e9e7e2;margin:30px 0;"></div>
+        <p style="font-size:13px;line-height:1.8;color:#777;margin:0;">이 메일은 <strong style="color:#333;">${escapeHtml(email)}</strong> 주소의 구독 신청에 따라 발송되었습니다.</p>
+      </div>
+      <div style="padding:22px 4px;font-size:12px;line-height:1.8;color:#888;">
+        새로운 소식을 더 이상 받고 싶지 않다면
+        <a href="${unsubscribeUrl}" style="color:#666;">구독 취소</a>를 눌러주세요.
+        <br />Ramic Studio · ramicstudio.com
+      </div>
+    </div>
+  </body>
+</html>`;
+  try {
+    return await sendEmail(
+      email,
+      "라믹 스튜디오 소식 구독을 환영합니다",
+      html,
+      `welcome/${createHash("sha256").update(email).digest("hex")}`
+    );
+  } catch (error) {
+    console.error("[Newsletter] welcome email failed:", email, error instanceof Error ? error.message : error);
+    return { sent: false, skipped: false, failed: true, message: "환영 메일 전송에 실패했습니다." };
+  }
+}
+
 export async function subscribeToNewsletter(email: string) {
   const normalized = normalizeEmail(email);
   const token = tokenForEmail(normalized);
-  return saveSubscription(normalized, tokenHash(token));
+  const result = await saveSubscription(normalized, tokenHash(token));
+  if (!result.success || !result.welcomePending) return result;
+  const welcome = await sendWelcomeEmail(normalized);
+  if (welcome.sent) await markWelcomeSent(normalized);
+  return { ...result, welcome };
 }
 
 export async function unsubscribeFromNewsletter(token: string) {
