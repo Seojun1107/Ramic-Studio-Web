@@ -125,6 +125,16 @@ async function startServer() {
   // Preview ZIPs use a binary upload route below; JSON only needs to cover ordinary CMS media.
   app.use(express.json({ limit: "80mb" }));
   app.use(express.urlencoded({ limit: "80mb", extended: true }));
+  app.get("/api/newsletter/unsubscribe", async (req, res) => {
+    const token = typeof req.query.token === "string" ? req.query.token : "";
+    const { unsubscribeFromNewsletter } = await import("./newsletter");
+    const success = await unsubscribeFromNewsletter(token);
+    res.status(success ? 200 : 400).type("html").send(
+      success
+        ? '<!doctype html><html lang="ko"><meta charset="utf-8"><title>구독 취소</title><body style="font-family:Arial,sans-serif;padding:48px;line-height:1.7"><h1>구독이 취소되었습니다.</h1><p>앞으로 Ramic Studio의 뉴스레터를 보내지 않습니다.</p></body></html>'
+        : '<!doctype html><html lang="ko"><meta charset="utf-8"><title>구독 취소 실패</title><body style="font-family:Arial,sans-serif;padding:48px;line-height:1.7"><h1>구독 취소 링크가 올바르지 않습니다.</h1><p>이미 취소되었거나 유효하지 않은 링크입니다.</p></body></html>'
+    );
+  });
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerAdminAuthRoutes(app);
