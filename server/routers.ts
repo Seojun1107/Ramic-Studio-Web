@@ -26,6 +26,7 @@ import {
 } from "./db";
 import { hash } from "bcryptjs";
 import { publishDiscordNotice } from "./_core/discord";
+import { sendNoticeNewsletter, subscribeToNewsletter } from "./_core/newsletter";
 const gameInput = z.object({
   code: z.string().min(1).max(20),
   title: z.string().min(1).max(120),
@@ -49,6 +50,7 @@ const noticeInput = z.object({
   discordMentionEveryone: z.boolean().default(false),
   discordMode: z.enum(["same", "custom"]).default("same"),
   discordBody: z.string().max(100000).optional(),
+  newsletterNotify: z.boolean().default(true),
 });
 export const appRouter = router({
   system: systemRouter,
@@ -61,6 +63,11 @@ export const appRouter = router({
       });
       return { success: true } as const;
     }),
+  }),
+  newsletter: router({
+    subscribe: publicProcedure
+      .input(z.object({ email: z.string().trim().email().max(254) }))
+      .mutation(({ input }) => subscribeToNewsletter(input.email)),
   }),
   site: router({
     settings: publicProcedure.query(() => getSettings()),
@@ -78,6 +85,7 @@ export const appRouter = router({
         discordMentionEveryone,
         discordMode,
         discordBody,
+        newsletterNotify,
         ...notice
       } = input;
       const created = await createNotice({
@@ -89,6 +97,15 @@ export const appRouter = router({
           notice: null,
           discord: { sent: false, message: "공지 저장에 실패했습니다." },
         };
+      const newsletter = newsletterNotify
+        ? await sendNoticeNewsletter(created)
+        : {
+            sent: 0,
+            failed: 0,
+            skipped: true,
+            total: 0,
+            message: "이메일 전송을 건너뛰었습니다.",
+          };
       const discord = discordNotify
         ? await publishDiscordNotice({
             title: created.title,
@@ -101,7 +118,7 @@ export const appRouter = router({
             skipped: true as const,
             message: "Discord 전송을 건너뛰었습니다.",
           };
-      return { notice: created, discord };
+      return { notice: created, newsletter, discord };
     }),
     update: adminProcedure
       .input(noticeInput.extend({ id: z.string() }))
@@ -132,7 +149,7 @@ export const appRouter = router({
               skipped: true as const,
               message: "Discord 전송을 건너뛰었습니다.",
             };
-        return { notice: updated, discord };
+        return { notice: updated, newsletter: { sent: 0, failed: 0, skipped: true, total: 0, message: "수정된 공지는 이메일을 다시 보내지 않습니다." }, discord };
       }),
     remove: adminProcedure
       .input(z.object({ id: z.string() }))
