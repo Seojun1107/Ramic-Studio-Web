@@ -1,10 +1,6 @@
 import { createHash, createHmac } from "crypto";
 import { ENV } from "./env";
-import {
-  listNewsletterSubscribers,
-  subscribeNewsletter,
-  unsubscribeNewsletter,
-} from "../db";
+import { getDb } from "../db";
 import type { Notice } from "../../shared/types";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
