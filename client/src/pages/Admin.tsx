@@ -42,6 +42,7 @@ const emptyNotice = {
   title: "",
   body: "",
   discordNotify: false,
+  newsletterNotify: true,
   discordMentionEveryone: false,
   discordMode: "same" as "same" | "custom",
   discordBody: "",
@@ -488,7 +489,9 @@ export default function Admin() {
       setNotice(emptyNotice);
       setNoticeFeedback({
         tone: result.discord.sent ? "success" : "success",
-        message: result.discord.message,
+        message: [result.newsletter?.message, result.discord.message]
+          .filter(Boolean)
+          .join(" · "),
       });
       void utils.admin.notices.invalidate();
     },
@@ -788,6 +791,7 @@ export default function Admin() {
                               title: item.title,
                               body: item.body,
                               discordNotify: false,
+                              newsletterNotify: false,
                               discordMentionEveryone: false,
                               discordMode: "same",
                               discordBody: "",
@@ -901,6 +905,25 @@ export default function Admin() {
                     placeholder="## 업데이트 소식\n\n본문에 들어갈 내용을 작성하세요."
                   />
                 </label>
+                <fieldset className="discord-options">
+                  <legend>EMAIL 뉴스레터</legend>
+                  <label className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={notice.newsletterNotify}
+                      onChange={e =>
+                        setNotice({
+                          ...notice,
+                          newsletterNotify: e.target.checked,
+                        })
+                      }
+                    />
+                    발행 시 이메일 구독자에게 공지 보내기
+                  </label>
+                  <p className="field-help">
+                    현재 활성화된 뉴스레터 구독자에게 이 공지가 이메일로 전송됩니다. 공지 수정 시에는 다시 발송하지 않습니다.
+                  </p>
+                </fieldset>
                 <fieldset className="discord-options">
                   <legend>DISCORD 공지 옵션</legend>
                   <label className="check-row">
