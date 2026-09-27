@@ -9,6 +9,45 @@ import type { Notice } from "../../shared/types";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
+async function subscribersCollection() {
+  const db = await getDb();
+  if (!db) return null;
+  const collection = db.collection("newsletter_subscribers");
+  await collection.createIndex({ email: 1 }, { unique: true });
+  await collection.createIndex({ active: 1 });
+  return collection;
+}
+
+async function saveSubscription(email: string, unsubscribeTokenHash: string) {
+  const c = await subscribersCollection();
+  if (!c) return { success: false, active: false, created: false } as const;
+  const existing = await c.findOne({ email });
+  if (existing?.active === true) return { success: true, active: true, created: false } as const;
+  const now = new Date();
+  await c.updateOne(
+    { email },
+    { $set: { email, active: true, unsubscribeTokenHash, updatedAt: now }, $setOnInsert: { createdAt: now } },
+    { upsert: true }
+  );
+  return { success: true, active: true, created: !existing } as const;
+}
+
+async function disableSubscription(unsubscribeTokenHash: string) {
+  const c = await subscribersCollection();
+  if (!c) return false;
+  const result = await c.updateOne(
+    { unsubscribeTokenHash, active: true },
+    { $set: { active: false, updatedAt: new Date() } }
+  );
+  return result.modifiedCount > 0;
+}
+
+async function activeSubscribers() {
+  const c = await subscribersCollection();
+  if (!c) return [];
+  return (await c.find({ active: true }).sort({ createdAt: 1 }).toArray()).map(d => ({ email: String(d.email) }));
+}
+
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
@@ -81,16 +120,16 @@ async function sendEmail(to: string, subject: string, html: string, idempotencyK
 export async function subscribeToNewsletter(email: string) {
   const normalized = normalizeEmail(email);
   const token = tokenForEmail(normalized);
-  return subscribeNewsletter(normalized, tokenHash(token));
+  return saveSubscription(normalized, tokenHash(token));
 }
 
 export async function unsubscribeFromNewsletter(token: string) {
   if (!/^[a-f0-9]{64}$/i.test(token)) return false;
-  return unsubscribeNewsletter(tokenHash(token));
+  return disableSubscription(tokenHash(token));
 }
 
 export async function sendNoticeNewsletter(notice: Notice) {
-  const subscribers = await listNewsletterSubscribers();
+  const subscribers = await activeSubscribers();
   if (!subscribers.length) {
     return { sent: 0, failed: 0, skipped: true, total: 0, message: "활성 구독자가 없습니다." };
   }
