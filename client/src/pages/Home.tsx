@@ -81,12 +81,25 @@ function GameActions({ game }: { game: any }) {
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeGame, setActiveGame] = useState(0);
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [newsletterMessage, setNewsletterMessage] = useState("");
   const heroRef = useRef<HTMLElement>(null);
   const pointerFrame = useRef<number | null>(null);
   const { data: gameData } = trpc.site.games.useQuery();
   const { data: noticeData } = trpc.news.list.useQuery();
   const { data: teamData } = trpc.site.team.useQuery();
   const { data: siteSettings } = trpc.site.settings.useQuery();
+  const subscribeNewsletter = trpc.newsletter.subscribe.useMutation({
+    onSuccess: result => {
+      setNewsletterMessage(
+        result.created
+          ? "구독되었습니다. 새로운 소식을 이메일로 보내드릴게요."
+          : "이미 구독 중인 이메일 주소입니다."
+      );
+      setNewsletterEmail("");
+    },
+    onError: error => setNewsletterMessage(error.message || "구독에 실패했습니다."),
+  });
   const footerSocials =
     siteSettings?.socialLinks ??
     [
@@ -428,7 +441,14 @@ export default function Home() {
             <em>궁금해 주세요.</em>
           </h2>
           <p>새로운 세계와 스튜디오 소식을 가끔 보내드립니다.</p>
-          <form className="signup" onSubmit={event => event.preventDefault()}>
+          <form
+            className="signup"
+            onSubmit={event => {
+              event.preventDefault();
+              setNewsletterMessage("");
+              subscribeNewsletter.mutate({ email: newsletterEmail });
+            }}
+          >
             <label className="sr-only" htmlFor="email">
               이메일 주소
             </label>
@@ -436,12 +456,21 @@ export default function Home() {
               id="email"
               type="email"
               placeholder="your@email.com"
+              value={newsletterEmail}
+              onChange={event => setNewsletterEmail(event.target.value)}
+              disabled={subscribeNewsletter.isPending}
               required
             />
-            <button type="submit">
-              구독하기 <ArrowUpRight size={16} />
+            <button type="submit" disabled={subscribeNewsletter.isPending}>
+              {subscribeNewsletter.isPending ? "등록 중..." : "구독하기"}{" "}
+              <ArrowUpRight size={16} />
             </button>
           </form>
+          {newsletterMessage && (
+            <p className="newsletter-message" role="status">
+              {newsletterMessage}
+            </p>
+          )}
         </section>
       </main>
       <footer className="site-footer">
