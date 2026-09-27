@@ -95,6 +95,7 @@ export const appRouter = router({
       if (!created)
         return {
           notice: null,
+          newsletter: { sent: false, skipped: true, total: 0, message: "공지 저장에 실패해 이메일을 보내지 않았습니다." },
           discord: { sent: false, message: "공지 저장에 실패했습니다." },
         };
       const newsletter = newsletterNotify
@@ -129,6 +130,7 @@ export const appRouter = router({
           discordMentionEveryone,
           discordMode,
           discordBody,
+          newsletterNotify: _newsletterNotify,
           ...notice
         } = input;
         const updated = await updateNotice(id, notice);
