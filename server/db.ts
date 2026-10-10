@@ -7,6 +7,7 @@ import {
 } from "mongodb";
 import type {
   Game,
+  Faq,
   InsertNotice,
   Notice,
   SiteSettings,
@@ -40,6 +41,7 @@ export async function getDb(): Promise<Db | null> {
             .collection("users")
             .createIndex({ username: 1 }, { unique: true, sparse: true }),
           database.collection("notices").createIndex({ publishedAt: -1 }),
+          database.collection("faqs").createIndex({ sortOrder: 1, createdAt: -1 }),
           database.collection("games").createIndex({ createdAt: -1 }),
           database.collection("team").createIndex({ sortOrder: 1 }),
           database.collection("security_logs").createIndex({ createdAt: -1 }),
@@ -82,6 +84,16 @@ export function normalizeMongoUser(d: AnyDoc): User {
     lastSignedIn: date(d.lastSignedIn),
   };
 }
+const normalizeFaq = (d: AnyDoc): Faq => ({
+  id: id(d),
+  question: d.question ?? "",
+  answer: d.answer ?? "",
+  category: d.category ?? "GENERAL",
+  sortOrder: Number(d.sortOrder ?? 0),
+  isPublished: d.isPublished !== false,
+  createdAt: date(d.createdAt),
+  updatedAt: date(d.updatedAt),
+});
 const normalizeNotice = (d: AnyDoc): Notice => ({
   id: id(d),
   category: d.category,
@@ -231,6 +243,35 @@ export async function deleteNotice(idValue: string) {
   return (
     (await c.deleteOne({ _id: documentId(idValue) } as any)).deletedCount > 0
   );
+}
+export async function listFaqs(publicOnly = false) {
+  const c = await col("faqs");
+  if (!c) return [];
+  const filter = publicOnly ? { isPublished: { $ne: false } } : {};
+  return (await c.find(filter).sort({ sortOrder: 1, createdAt: -1 }).limit(200).toArray()).map(normalizeFaq);
+}
+export async function createFaq(input: Omit<Faq, "id" | "createdAt" | "updatedAt">) {
+  const c = await col("faqs");
+  if (!c) return null;
+  const now = new Date();
+  const d = { ...input, question: input.question.trim(), answer: input.answer.trim(), createdAt: now, updatedAt: now };
+  const r = await c.insertOne(d);
+  return normalizeFaq({ ...d, _id: r.insertedId });
+}
+export async function updateFaq(idValue: string, input: Omit<Faq, "id" | "createdAt" | "updatedAt">) {
+  const c = await col("faqs");
+  if (!c) return null;
+  const result = await c.findOneAndUpdate(
+    { _id: documentId(idValue) } as any,
+    { $set: { ...input, question: input.question.trim(), answer: input.answer.trim(), updatedAt: new Date() } },
+    { returnDocument: "after" }
+  );
+  return result ? normalizeFaq(result) : null;
+}
+export async function deleteFaq(idValue: string) {
+  const c = await col("faqs");
+  if (!c) return false;
+  return (await c.deleteOne({ _id: documentId(idValue) } as any)).deletedCount > 0;
 }
 export async function listGames(protectPreview = false) {
   const c = await col("games");

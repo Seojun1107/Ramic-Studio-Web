@@ -11,6 +11,7 @@ const Home = lazy(() => import("./pages/Home"));
 const News = lazy(() => import("./pages/News"));
 const NewsDetail = lazy(() => import("./pages/NewsDetail"));
 const Admin = lazy(() => import("./pages/Admin"));
+const Faq = lazy(() => import("./pages/Faq"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 
 function Loader({ compact = false }: { compact?: boolean }) {
@@ -97,6 +98,7 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/news/:id" component={NewsDetail} />
         <Route path="/news" component={News} />
+        <Route path="/faq" component={Faq} />
         <Route path="/admin" component={Admin} />
         <Route path="/admin/login" component={AdminLogin} />
         <Route path="/404" component={NotFound} />

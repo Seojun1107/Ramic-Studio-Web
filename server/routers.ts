@@ -7,20 +7,24 @@ import {
   addAdmin,
   changeAdminPassword,
   createGame,
+  createFaq,
   createNotice,
   createTeam,
   deleteGame,
+  deleteFaq,
   deleteNotice,
   deleteTeam,
   getNotice,
   getSettings,
   listAllTeam,
   listGames,
+  listFaqs,
   listNotices,
   listSecurityLogs,
   listTeam,
   saveSettings,
   updateGame,
+  updateFaq,
   updateNotice,
   updateTeam,
 } from "./db";
@@ -39,6 +43,13 @@ const gameInput = z.object({
   externalLabel: z.string().max(40).nullable().optional(),
   isNew: z.boolean().default(false),
   previewUrl: z.string().max(2000).nullable().optional(),
+});
+const faqInput = z.object({
+  question: z.string().min(3).max(255),
+  answer: z.string().min(1).max(10000),
+  category: z.string().min(1).max(40).default("GENERAL"),
+  sortOrder: z.number().int().min(0).max(9999).default(0),
+  isPublished: z.boolean().default(true),
 });
 const noticeInput = z.object({
   category: z.string().min(1).max(40),
@@ -73,6 +84,9 @@ export const appRouter = router({
     settings: publicProcedure.query(() => getSettings()),
     games: publicProcedure.query(async () => listGames(true)),
     team: publicProcedure.query(async () => listTeam()),
+  }),
+  faq: router({
+    list: publicProcedure.query(() => listFaqs(true)),
   }),
   news: router({
     list: publicProcedure.query(() => listNotices()),
@@ -162,6 +176,13 @@ export const appRouter = router({
     notices: adminProcedure.query(() => listNotices()),
     games: adminProcedure.query(() => listGames()),
     team: adminProcedure.query(() => listAllTeam()),
+    faqs: adminProcedure.query(() => listFaqs()),
+    createFaq: adminProcedure.input(faqInput).mutation(({ input }) => createFaq(input)),
+    updateFaq: adminProcedure.input(faqInput.extend({ id: z.string() })).mutation(({ input }) => {
+      const { id, ...faq } = input;
+      return updateFaq(id, faq);
+    }),
+    deleteFaq: adminProcedure.input(z.object({ id: z.string() })).mutation(({ input }) => deleteFaq(input.id)),
     createGame: adminProcedure
       .input(gameInput)
       .mutation(({ input }) => createGame(input)),

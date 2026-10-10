@@ -1,0 +1,1 @@
+{"routes":[{"path":"/","title":"Ramic Studio"},{"path":"/news","title":"공지사항"},{"path":"/news/:id","title":"공지사항 상세"},{"path":"/faq","title":"FAQ"},{"path":"/admin","title":"관리자"},{"path":"/admin/login","title":"관리자 로그인"}]}

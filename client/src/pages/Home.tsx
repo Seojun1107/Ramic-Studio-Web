@@ -166,6 +166,9 @@ export default function Home() {
           <Link href="/news" onClick={() => setMenuOpen(false)}>
             공지사항
           </Link>
+          <Link href="/faq" onClick={() => setMenuOpen(false)}>
+            FAQ
+          </Link>
           <a href="#team" onClick={() => setMenuOpen(false)}>
             팀
           </a>
@@ -441,6 +444,9 @@ export default function Home() {
             <em>궁금해 주세요.</em>
           </h2>
           <p>새로운 세계와 스튜디오 소식을 가끔 보내드립니다.</p>
+          <Link className="text-link home-faq-link" href="/faq">
+            자주 묻는 질문과 문의하기 <ArrowUpRight size={16} />
+          </Link>
           <form
             className="signup"
             onSubmit={event => {

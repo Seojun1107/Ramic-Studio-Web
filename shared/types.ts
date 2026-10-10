@@ -19,6 +19,16 @@ export type InsertUser = Partial<
 };
 
 export type NoticeCategory = string;
+export type Faq = {
+  id: string;
+  question: string;
+  answer: string;
+  category: string;
+  sortOrder: number;
+  isPublished: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
 export type Notice = {
   id: string;
   category: NoticeCategory;

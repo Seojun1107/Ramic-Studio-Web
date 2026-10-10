@@ -17,13 +17,14 @@ import {
   Trash2,
   Upload,
   Users,
+  HelpCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 
-type Tab = "overview" | "news" | "games" | "team" | "settings" | "security";
+type Tab = "overview" | "news" | "faq" | "games" | "team" | "settings" | "security";
 const emptyGame = {
   code: "R-04",
   title: "",
@@ -46,6 +47,13 @@ const emptyNotice = {
   discordMentionEveryone: false,
   discordMode: "same" as "same" | "custom",
   discordBody: "",
+};
+const emptyFaq = {
+  question: "",
+  answer: "",
+  category: "GENERAL",
+  sortOrder: 0,
+  isPublished: true,
 };
 const emptyMember = {
   name: "",
@@ -370,6 +378,8 @@ export default function Admin() {
     message: string;
   } | null>(null);
   const [editingNotice, setEditingNotice] = useState<string | null>(null);
+  const [faq, setFaq] = useState(emptyFaq);
+  const [editingFaq, setEditingFaq] = useState<string | null>(null);
   const [game, setGame] = useState(emptyGame);
   const [editingGame, setEditingGame] = useState<string | null>(null);
   const [member, setMember] = useState(emptyMember);
@@ -395,6 +405,7 @@ export default function Admin() {
   const [deployBaseSha, setDeployBaseSha] = useState("");
   const utils = trpc.useUtils();
   const settings = trpc.site.settings.useQuery();
+  const faqs = trpc.admin.faqs.useQuery(undefined, { enabled: authorized });
   const notices = trpc.admin.notices.useQuery(undefined, {
     enabled: authorized,
   });
@@ -520,6 +531,15 @@ export default function Admin() {
   const removeNotice = trpc.news.remove.useMutation({
     onSuccess: () => void utils.admin.notices.invalidate(),
   });
+  const createFaq = trpc.admin.createFaq.useMutation({
+    onSuccess: () => { setFaq(emptyFaq); void utils.admin.faqs.invalidate(); },
+  });
+  const updateFaq = trpc.admin.updateFaq.useMutation({
+    onSuccess: () => { setFaq(emptyFaq); setEditingFaq(null); void utils.admin.faqs.invalidate(); },
+  });
+  const removeFaq = trpc.admin.deleteFaq.useMutation({
+    onSuccess: () => void utils.admin.faqs.invalidate(),
+  });
   const createGame = trpc.admin.createGame.useMutation({
     onSuccess: () => {
       setGame(emptyGame);
@@ -628,19 +648,22 @@ export default function Admin() {
       }));
     }
   }
-  function confirmDelete(kind: "notice" | "game" | "team", id: string) {
+  function confirmDelete(kind: "notice" | "game" | "team" | "faq", id: string) {
     if (
       !window.confirm(
         kind === "notice"
           ? "이 공지사항을 삭제할까요? 삭제 후 복구할 수 없습니다."
           : kind === "game"
             ? "이 게임을 삭제할까요? 삭제 후 복구할 수 없습니다."
-            : "이 직원을 삭제할까요? 삭제 후 복구할 수 없습니다."
+            : kind === "faq"
+              ? "이 FAQ를 삭제할까요? 삭제 후 복구할 수 없습니다."
+              : "이 직원을 삭제할까요? 삭제 후 복구할 수 없습니다."
       )
     )
       return;
     if (kind === "notice") removeNotice.mutate({ id });
     else if (kind === "game") removeGame.mutate({ id });
+    else if (kind === "faq") removeFaq.mutate({ id });
     else removeTeam.mutate({ id });
   }
   function insertMedia(markdown: string) {
@@ -654,6 +677,7 @@ export default function Admin() {
   const menu: [Tab, string, any][] = [
     ["overview", "대시보드", LayoutDashboard],
     ["news", "공지사항", Newspaper],
+    ["faq", "FAQ 관리", HelpCircle],
     ["games", "게임 콘텐츠", Gamepad2],
     ["team", "팀 / 직원", Users],
     ["settings", "사이트 설정", Settings2],
@@ -730,6 +754,10 @@ export default function Admin() {
                   <strong>{games.data?.length ?? 0}</strong>
                 </div>
                 <div>
+                  <span>FAQ</span>
+                  <strong>{faqs.data?.length ?? 0}</strong>
+                </div>
+                <div>
                   <span>관리자 인증</span>
                   <strong>12H</strong>
                 </div>
@@ -740,6 +768,7 @@ export default function Admin() {
                   <b>공지사항 관리</b>
                   <small>현재 글을 보고 발행·수정·삭제합니다.</small>
                 </button>
+                <button onClick={() => setTab("faq")}><HelpCircle /><b>FAQ 관리</b><small>질문과 답변을 추가하고 공개 여부를 관리합니다.</small></button>
                 <button onClick={() => setTab("games")}>
                   <Gamepad2 />
                   <b>게임 콘텐츠 관리</b>
@@ -993,6 +1022,31 @@ export default function Admin() {
                   {editingNotice ? <Pencil size={16} /> : <Plus size={16} />}{" "}
                   {editingNotice ? "공지사항 수정" : "공지사항 발행"}
                 </button>
+              </form>
+            </section>
+          )}
+          {tab === "faq" && (
+            <section className="notice-editor faq-admin-editor">
+              <div className="content-head">
+                <div><p className="eyebrow">CONTENT / FAQ</p><h2>{editingFaq ? "FAQ 수정" : "질문 추가"}</h2></div>
+                <button className="subtle-button" onClick={() => void faqs.refetch()}><RefreshCw size={14} /> 목록 새로고침</button>
+              </div>
+              <div className="cms-list">
+                {faqs.isLoading ? <p className="empty-state">FAQ를 불러오는 중...</p> : faqs.data?.length ? faqs.data.map(item => (
+                  <article className="cms-item" key={item.id}>
+                    <div><span className="news-tag">{item.category} · {item.isPublished ? "PUBLIC" : "DRAFT"}</span><h3>{item.question}</h3><small>노출 순서 {item.sortOrder}</small></div>
+                    <div className="cms-actions"><button onClick={() => { setEditingFaq(item.id); setFaq({ question: item.question, answer: item.answer, category: item.category, sortOrder: item.sortOrder, isPublished: item.isPublished }); }}><Pencil size={14} /> 수정</button><button className="danger" onClick={() => confirmDelete("faq", item.id)}><Trash2 size={14} /> 삭제</button></div>
+                  </article>
+                )) : <p className="empty-state">아직 저장된 FAQ가 없습니다. 첫 질문을 추가해 보세요.</p>}
+              </div>
+              <div className="editor-divider"><span>{editingFaq ? "EDIT / 선택한 FAQ" : "NEW / 새 FAQ"}</span>{editingFaq && <button className="subtle-button" onClick={() => { setEditingFaq(null); setFaq(emptyFaq); }}>새 질문으로 전환</button>}</div>
+              <p className="editor-intro">공개로 설정한 질문만 FAQ 페이지에 표시됩니다. 노출 순서가 낮은 질문부터 위에 배치됩니다.</p>
+              <form onSubmit={e => { e.preventDefault(); if (editingFaq) updateFaq.mutate({ id: editingFaq, ...faq }); else createFaq.mutate(faq); }}>
+                <div className="editor-grid"><label>분류<input required value={faq.category} onChange={e => setFaq({ ...faq, category: e.target.value })} placeholder="GAME / STUDIO" /></label><label>노출 순서<input type="number" min="0" value={faq.sortOrder} onChange={e => setFaq({ ...faq, sortOrder: Number(e.target.value) })} /></label></div>
+                <label>질문<input required value={faq.question} onChange={e => setFaq({ ...faq, question: e.target.value })} placeholder="라믹 스튜디오는 어떤 게임을 만드나요?" /></label>
+                <label>답변<textarea required rows={8} value={faq.answer} onChange={e => setFaq({ ...faq, answer: e.target.value })} placeholder="방문자에게 보여줄 답변을 입력하세요." /></label>
+                <label className="check-row"><input type="checkbox" checked={faq.isPublished} onChange={e => setFaq({ ...faq, isPublished: e.target.checked })} /> 공개 페이지에 표시</label>
+                <button className="publish-button">{editingFaq ? <Pencil size={16} /> : <Plus size={16} />} {editingFaq ? "FAQ 수정" : "FAQ 저장"}</button>
               </form>
             </section>
           )}
