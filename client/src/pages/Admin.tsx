@@ -18,13 +18,22 @@ import {
   Upload,
   Users,
   HelpCircle,
+  CreditCard,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 
-type Tab = "overview" | "news" | "faq" | "games" | "team" | "settings" | "security";
+type Tab =
+  | "overview"
+  | "news"
+  | "faq"
+  | "games"
+  | "payments"
+  | "team"
+  | "settings"
+  | "security";
 const emptyGame = {
   code: "R-04",
   title: "",
@@ -37,6 +46,8 @@ const emptyGame = {
   externalLabel: "STEAM",
   isNew: false,
   previewUrl: "",
+  priceKRW: null as number | null,
+  isPurchasable: false,
 };
 const emptyNotice = {
   category: "STUDIO",
@@ -414,6 +425,19 @@ export default function Admin() {
   const securityLogs = trpc.admin.securityLogs.useQuery(undefined, {
     enabled: authorized && tab === "security",
   });
+  const paymentOrders = trpc.admin.paymentOrders.useQuery(undefined, {
+    enabled: authorized && tab === "payments",
+  });
+  const paymentStats = trpc.admin.paymentStats.useQuery(undefined, {
+    enabled: authorized,
+  });
+  const steamKeys = trpc.admin.steamKeys.useQuery(undefined, {
+    enabled: authorized && tab === "payments",
+  });
+  const [steamKeyForm, setSteamKeyForm] = useState({
+    gameId: "",
+    steamKey: "",
+  });
   useEffect(() => {
     if (settings.data)
       setSocials({
@@ -532,10 +556,17 @@ export default function Admin() {
     onSuccess: () => void utils.admin.notices.invalidate(),
   });
   const createFaq = trpc.admin.createFaq.useMutation({
-    onSuccess: () => { setFaq(emptyFaq); void utils.admin.faqs.invalidate(); },
+    onSuccess: () => {
+      setFaq(emptyFaq);
+      void utils.admin.faqs.invalidate();
+    },
   });
   const updateFaq = trpc.admin.updateFaq.useMutation({
-    onSuccess: () => { setFaq(emptyFaq); setEditingFaq(null); void utils.admin.faqs.invalidate(); },
+    onSuccess: () => {
+      setFaq(emptyFaq);
+      setEditingFaq(null);
+      void utils.admin.faqs.invalidate();
+    },
   });
   const removeFaq = trpc.admin.deleteFaq.useMutation({
     onSuccess: () => void utils.admin.faqs.invalidate(),
@@ -555,6 +586,18 @@ export default function Admin() {
   });
   const removeGame = trpc.admin.deleteGame.useMutation({
     onSuccess: () => void utils.admin.games.invalidate(),
+  });
+  const createSteamKey = trpc.admin.createSteamKey.useMutation({
+    onSuccess: () => {
+      setSteamKeyForm({ gameId: "", steamKey: "" });
+      void utils.admin.steamKeys.invalidate();
+    },
+  });
+  const deleteSteamKey = trpc.admin.deleteSteamKey.useMutation({
+    onSuccess: () => void utils.admin.steamKeys.invalidate(),
+  });
+  const updateSteamKey = trpc.admin.updateSteamKey.useMutation({
+    onSuccess: () => void utils.admin.steamKeys.invalidate(),
   });
   const createTeam = trpc.admin.createTeam.useMutation({
     onSuccess: () => {
@@ -679,6 +722,7 @@ export default function Admin() {
     ["news", "공지사항", Newspaper],
     ["faq", "FAQ 관리", HelpCircle],
     ["games", "게임 콘텐츠", Gamepad2],
+    ["payments", "결제 / 스팀키", CreditCard],
     ["team", "팀 / 직원", Users],
     ["settings", "사이트 설정", Settings2],
     ["security", "보안 / 계정", KeyRound],
@@ -768,7 +812,11 @@ export default function Admin() {
                   <b>공지사항 관리</b>
                   <small>현재 글을 보고 발행·수정·삭제합니다.</small>
                 </button>
-                <button onClick={() => setTab("faq")}><HelpCircle /><b>FAQ 관리</b><small>질문과 답변을 추가하고 공개 여부를 관리합니다.</small></button>
+                <button onClick={() => setTab("faq")}>
+                  <HelpCircle />
+                  <b>FAQ 관리</b>
+                  <small>질문과 답변을 추가하고 공개 여부를 관리합니다.</small>
+                </button>
                 <button onClick={() => setTab("games")}>
                   <Gamepad2 />
                   <b>게임 콘텐츠 관리</b>
@@ -950,7 +998,8 @@ export default function Admin() {
                     발행 시 이메일 구독자에게 공지 보내기
                   </label>
                   <p className="field-help">
-                    현재 활성화된 뉴스레터 구독자에게 이 공지가 이메일로 전송됩니다. 공지 수정 시에는 다시 발송하지 않습니다.
+                    현재 활성화된 뉴스레터 구독자에게 이 공지가 이메일로
+                    전송됩니다. 공지 수정 시에는 다시 발송하지 않습니다.
                   </p>
                 </fieldset>
                 <fieldset className="discord-options">
@@ -1028,25 +1077,143 @@ export default function Admin() {
           {tab === "faq" && (
             <section className="notice-editor faq-admin-editor">
               <div className="content-head">
-                <div><p className="eyebrow">CONTENT / FAQ</p><h2>{editingFaq ? "FAQ 수정" : "질문 추가"}</h2></div>
-                <button className="subtle-button" onClick={() => void faqs.refetch()}><RefreshCw size={14} /> 목록 새로고침</button>
+                <div>
+                  <p className="eyebrow">CONTENT / FAQ</p>
+                  <h2>{editingFaq ? "FAQ 수정" : "질문 추가"}</h2>
+                </div>
+                <button
+                  className="subtle-button"
+                  onClick={() => void faqs.refetch()}
+                >
+                  <RefreshCw size={14} /> 목록 새로고침
+                </button>
               </div>
               <div className="cms-list">
-                {faqs.isLoading ? <p className="empty-state">FAQ를 불러오는 중...</p> : faqs.data?.length ? faqs.data.map(item => (
-                  <article className="cms-item" key={item.id}>
-                    <div><span className="news-tag">{item.category} · {item.isPublished ? "PUBLIC" : "DRAFT"}</span><h3>{item.question}</h3><small>노출 순서 {item.sortOrder}</small></div>
-                    <div className="cms-actions"><button onClick={() => { setEditingFaq(item.id); setFaq({ question: item.question, answer: item.answer, category: item.category, sortOrder: item.sortOrder, isPublished: item.isPublished }); }}><Pencil size={14} /> 수정</button><button className="danger" onClick={() => confirmDelete("faq", item.id)}><Trash2 size={14} /> 삭제</button></div>
-                  </article>
-                )) : <p className="empty-state">아직 저장된 FAQ가 없습니다. 첫 질문을 추가해 보세요.</p>}
+                {faqs.isLoading ? (
+                  <p className="empty-state">FAQ를 불러오는 중...</p>
+                ) : faqs.data?.length ? (
+                  faqs.data.map(item => (
+                    <article className="cms-item" key={item.id}>
+                      <div>
+                        <span className="news-tag">
+                          {item.category} ·{" "}
+                          {item.isPublished ? "PUBLIC" : "DRAFT"}
+                        </span>
+                        <h3>{item.question}</h3>
+                        <small>노출 순서 {item.sortOrder}</small>
+                      </div>
+                      <div className="cms-actions">
+                        <button
+                          onClick={() => {
+                            setEditingFaq(item.id);
+                            setFaq({
+                              question: item.question,
+                              answer: item.answer,
+                              category: item.category,
+                              sortOrder: item.sortOrder,
+                              isPublished: item.isPublished,
+                            });
+                          }}
+                        >
+                          <Pencil size={14} /> 수정
+                        </button>
+                        <button
+                          className="danger"
+                          onClick={() => confirmDelete("faq", item.id)}
+                        >
+                          <Trash2 size={14} /> 삭제
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="empty-state">
+                    아직 저장된 FAQ가 없습니다. 첫 질문을 추가해 보세요.
+                  </p>
+                )}
               </div>
-              <div className="editor-divider"><span>{editingFaq ? "EDIT / 선택한 FAQ" : "NEW / 새 FAQ"}</span>{editingFaq && <button className="subtle-button" onClick={() => { setEditingFaq(null); setFaq(emptyFaq); }}>새 질문으로 전환</button>}</div>
-              <p className="editor-intro">공개로 설정한 질문만 FAQ 페이지에 표시됩니다. 노출 순서가 낮은 질문부터 위에 배치됩니다.</p>
-              <form onSubmit={e => { e.preventDefault(); if (editingFaq) updateFaq.mutate({ id: editingFaq, ...faq }); else createFaq.mutate(faq); }}>
-                <div className="editor-grid"><label>분류<input required value={faq.category} onChange={e => setFaq({ ...faq, category: e.target.value })} placeholder="GAME / STUDIO" /></label><label>노출 순서<input type="number" min="0" value={faq.sortOrder} onChange={e => setFaq({ ...faq, sortOrder: Number(e.target.value) })} /></label></div>
-                <label>질문<input required value={faq.question} onChange={e => setFaq({ ...faq, question: e.target.value })} placeholder="라믹 스튜디오는 어떤 게임을 만드나요?" /></label>
-                <label>답변<textarea required rows={8} value={faq.answer} onChange={e => setFaq({ ...faq, answer: e.target.value })} placeholder="방문자에게 보여줄 답변을 입력하세요." /></label>
-                <label className="check-row"><input type="checkbox" checked={faq.isPublished} onChange={e => setFaq({ ...faq, isPublished: e.target.checked })} /> 공개 페이지에 표시</label>
-                <button className="publish-button">{editingFaq ? <Pencil size={16} /> : <Plus size={16} />} {editingFaq ? "FAQ 수정" : "FAQ 저장"}</button>
+              <div className="editor-divider">
+                <span>{editingFaq ? "EDIT / 선택한 FAQ" : "NEW / 새 FAQ"}</span>
+                {editingFaq && (
+                  <button
+                    className="subtle-button"
+                    onClick={() => {
+                      setEditingFaq(null);
+                      setFaq(emptyFaq);
+                    }}
+                  >
+                    새 질문으로 전환
+                  </button>
+                )}
+              </div>
+              <p className="editor-intro">
+                공개로 설정한 질문만 FAQ 페이지에 표시됩니다. 노출 순서가 낮은
+                질문부터 위에 배치됩니다.
+              </p>
+              <form
+                onSubmit={e => {
+                  e.preventDefault();
+                  if (editingFaq) updateFaq.mutate({ id: editingFaq, ...faq });
+                  else createFaq.mutate(faq);
+                }}
+              >
+                <div className="editor-grid">
+                  <label>
+                    분류
+                    <input
+                      required
+                      value={faq.category}
+                      onChange={e =>
+                        setFaq({ ...faq, category: e.target.value })
+                      }
+                      placeholder="GAME / STUDIO"
+                    />
+                  </label>
+                  <label>
+                    노출 순서
+                    <input
+                      type="number"
+                      min="0"
+                      value={faq.sortOrder}
+                      onChange={e =>
+                        setFaq({ ...faq, sortOrder: Number(e.target.value) })
+                      }
+                    />
+                  </label>
+                </div>
+                <label>
+                  질문
+                  <input
+                    required
+                    value={faq.question}
+                    onChange={e => setFaq({ ...faq, question: e.target.value })}
+                    placeholder="라믹 스튜디오는 어떤 게임을 만드나요?"
+                  />
+                </label>
+                <label>
+                  답변
+                  <textarea
+                    required
+                    rows={8}
+                    value={faq.answer}
+                    onChange={e => setFaq({ ...faq, answer: e.target.value })}
+                    placeholder="방문자에게 보여줄 답변을 입력하세요."
+                  />
+                </label>
+                <label className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={faq.isPublished}
+                    onChange={e =>
+                      setFaq({ ...faq, isPublished: e.target.checked })
+                    }
+                  />{" "}
+                  공개 페이지에 표시
+                </label>
+                <button className="publish-button">
+                  {editingFaq ? <Pencil size={16} /> : <Plus size={16} />}{" "}
+                  {editingFaq ? "FAQ 수정" : "FAQ 저장"}
+                </button>
               </form>
             </section>
           )}
@@ -1104,6 +1271,8 @@ export default function Admin() {
                               externalLabel: item.externalLabel ?? "STEAM",
                               isNew: item.isNew,
                               previewUrl: item.previewUrl ?? "",
+                              priceKRW: item.priceKRW ?? null,
+                              isPurchasable: item.isPurchasable,
                             });
                             setTab("games");
                             window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1214,6 +1383,35 @@ export default function Admin() {
                     </select>
                   </label>
                 </div>
+                <div className="editor-grid">
+                  <label>
+                    공식 구매 가격 (KRW)
+                    <input
+                      type="number"
+                      min="0"
+                      value={game.priceKRW ?? ""}
+                      onChange={e =>
+                        setGame({
+                          ...game,
+                          priceKRW: e.target.value
+                            ? Number(e.target.value)
+                            : null,
+                        })
+                      }
+                      placeholder="예: 12000"
+                    />
+                  </label>
+                  <label className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={game.isPurchasable}
+                      onChange={e =>
+                        setGame({ ...game, isPurchasable: e.target.checked })
+                      }
+                    />{" "}
+                    공식 사이트에서 구매 가능
+                  </label>
+                </div>
                 <RepresentativeMediaField
                   value={game.videoUrl || game.imageUrl}
                   isVideo={Boolean(game.videoUrl)}
@@ -1273,6 +1471,195 @@ export default function Admin() {
                   {editingGame ? "게임 수정" : "게임 저장"}
                 </button>
               </form>
+            </section>
+          )}
+          {tab === "payments" && (
+            <section className="notice-editor payment-admin">
+              <div className="content-head">
+                <div>
+                  <p className="eyebrow">COMMERCE / PAYMENTS</p>
+                  <h2>결제 모니터링</h2>
+                </div>
+                <button
+                  className="subtle-button"
+                  onClick={() => {
+                    void paymentOrders.refetch();
+                    void steamKeys.refetch();
+                    void paymentStats.refetch();
+                  }}
+                >
+                  <RefreshCw size={14} /> 새로고침
+                </button>
+              </div>
+              <div className="admin-stats payment-stats">
+                <div>
+                  <span>총 주문</span>
+                  <strong>{paymentStats.data?.total ?? 0}</strong>
+                </div>
+                <div>
+                  <span>매출</span>
+                  <strong>
+                    ₩
+                    {new Intl.NumberFormat("ko-KR").format(
+                      paymentStats.data?.revenue ?? 0
+                    )}
+                  </strong>
+                </div>
+                <div>
+                  <span>발송 완료</span>
+                  <strong>{paymentStats.data?.fulfilled ?? 0}</strong>
+                </div>
+                <div>
+                  <span>처리 대기</span>
+                  <strong>{paymentStats.data?.pending ?? 0}</strong>
+                </div>
+              </div>
+              <div className="payment-chart">
+                <p className="eyebrow">LAST 31 DAYS / REVENUE</p>
+                {paymentStats.data?.daily?.length ? (
+                  paymentStats.data.daily.map((day: any) => (
+                    <div className="payment-chart-row" key={day.date}>
+                      <span>{day.date.slice(5)}</span>
+                      <i
+                        style={{
+                          width: `${Math.max(3, Math.min(100, (day.revenue / Math.max(...paymentStats.data!.daily.map((x: any) => x.revenue), 1)) * 100))}%`,
+                        }}
+                      />
+                      <b>
+                        ₩{new Intl.NumberFormat("ko-KR").format(day.revenue)}
+                      </b>
+                    </div>
+                  ))
+                ) : (
+                  <p className="empty-state">
+                    결제 데이터가 쌓이면 일별 그래프가 표시됩니다.
+                  </p>
+                )}
+              </div>
+              <div className="editor-divider">
+                <span>ORDERS / 결제자 정보</span>
+              </div>
+              <div className="cms-list">
+                {paymentOrders.data?.length ? (
+                  paymentOrders.data.map((order: any) => (
+                    <article className="cms-item" key={order.orderId}>
+                      <div>
+                        <span className="news-tag">
+                          {order.status} ·{" "}
+                          {order.paymentMethod ?? "결제수단 대기"}
+                        </span>
+                        <h3>{order.gameTitle}</h3>
+                        <small>
+                          {order.name} · {order.email} · {order.phone}
+                          <br />
+                          {order.steamKey
+                            ? `Steam Key: ${order.steamKey}`
+                            : "스팀키 발송 대기"}{" "}
+                          · ₩
+                          {new Intl.NumberFormat("ko-KR").format(order.amount)}
+                        </small>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="empty-state">아직 결제 주문이 없습니다.</p>
+                )}
+              </div>
+              <div className="editor-divider">
+                <span>STEAM KEYS / 키 재고</span>
+              </div>
+              <form
+                onSubmit={e => {
+                  e.preventDefault();
+                  createSteamKey.mutate(steamKeyForm);
+                }}
+              >
+                <div className="editor-grid">
+                  <label>
+                    게임
+                    <select
+                      required
+                      value={steamKeyForm.gameId}
+                      onChange={e =>
+                        setSteamKeyForm({
+                          ...steamKeyForm,
+                          gameId: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="">게임 선택</option>
+                      {games.data?.map(game => (
+                        <option value={game.id} key={game.id}>
+                          {game.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    스팀키
+                    <input
+                      required
+                      value={steamKeyForm.steamKey}
+                      onChange={e =>
+                        setSteamKeyForm({
+                          ...steamKeyForm,
+                          steamKey: e.target.value,
+                        })
+                      }
+                      placeholder="AAAAA-BBBBB-CCCCC"
+                    />
+                  </label>
+                </div>
+                <button className="publish-button">
+                  <Plus size={16} /> 스팀키 추가
+                </button>
+              </form>
+              <div className="cms-list">
+                {steamKeys.data?.map((item: any) => (
+                  <article className="cms-item" key={item.id}>
+                    <div>
+                      <span className="news-tag">
+                        {item.status} · {item.gameTitle}
+                      </span>
+                      <h3>{item.steamKey}</h3>
+                      <small>
+                        {item.orderId
+                          ? `주문 ${item.orderId}`
+                          : "판매 대기 재고"}
+                      </small>
+                    </div>
+                    {item.status === "AVAILABLE" && (
+                      <div className="cms-actions">
+                        <button
+                          className="subtle-button"
+                          onClick={() => {
+                            const next = window.prompt(
+                              "새 스팀키를 입력하세요.",
+                              item.steamKey
+                            );
+                            if (next?.trim() && next.trim() !== item.steamKey)
+                              updateSteamKey.mutate({
+                                id: item.id,
+                                steamKey: next.trim(),
+                              });
+                          }}
+                        >
+                          <Pencil size={14} /> 수정
+                        </button>
+                        <button
+                          className="danger"
+                          onClick={() => {
+                            if (window.confirm("이 스팀키를 삭제할까요?"))
+                              deleteSteamKey.mutate({ id: item.id });
+                          }}
+                        >
+                          <Trash2 size={14} /> 삭제
+                        </button>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
             </section>
           )}
           {tab === "team" && (

@@ -13,6 +13,7 @@ const NewsDetail = lazy(() => import("./pages/NewsDetail"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Faq = lazy(() => import("./pages/Faq"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const BuyGame = lazy(() => import("./pages/BuyGame"));
 
 function Loader({ compact = false }: { compact?: boolean }) {
   return (
@@ -99,6 +100,9 @@ function Router() {
         <Route path="/news/:id" component={NewsDetail} />
         <Route path="/news" component={News} />
         <Route path="/faq" component={Faq} />
+        <Route path="/buy/success" component={BuyGame} />
+        <Route path="/buy/fail" component={BuyGame} />
+        <Route path="/buy/:gameId" component={BuyGame} />
         <Route path="/admin" component={Admin} />
         <Route path="/admin/login" component={AdminLogin} />
         <Route path="/404" component={NotFound} />

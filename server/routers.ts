@@ -27,10 +27,13 @@ import {
   updateFaq,
   updateNotice,
   updateTeam,
+  getPaymentOrderByOrderId,
 } from "./db";
 import { hash } from "bcryptjs";
 import { publishDiscordNotice } from "./_core/discord";
 import { sendNoticeNewsletter, subscribeToNewsletter } from "./_core/newsletter";
+import { adminPaymentOrders, confirmPayment, createSteamKey, deleteSteamKey, startPayment, updateSteamKey } from "./payment";
+import { encryptPaymentData, decryptPaymentData } from "./_core/paymentCrypto";
 const gameInput = z.object({
   code: z.string().min(1).max(20),
   title: z.string().min(1).max(120),
@@ -43,6 +46,8 @@ const gameInput = z.object({
   externalLabel: z.string().max(40).nullable().optional(),
   isNew: z.boolean().default(false),
   previewUrl: z.string().max(2000).nullable().optional(),
+  priceKRW: z.number().int().min(0).max(1000000).nullable().optional(),
+  isPurchasable: z.boolean().default(false),
 });
 const faqInput = z.object({
   question: z.string().min(3).max(255),
@@ -79,6 +84,20 @@ export const appRouter = router({
     subscribe: publicProcedure
       .input(z.object({ email: z.string().trim().email().max(254) }))
       .mutation(({ input }) => subscribeToNewsletter(input.email)),
+  }),
+  payments: router({
+    start: publicProcedure
+      .input(z.object({ gameId: z.string(), name: z.string().min(2).max(100), email: z.string().email().max(254), phone: z.string().min(10).max(20) }))
+      .mutation(({ input }) => startPayment(input)),
+    confirm: publicProcedure
+      .input(z.object({ paymentKey: z.string().min(1).max(200), orderId: z.string().min(6).max(64), amount: z.number().int().positive() }))
+      .mutation(({ input }) => confirmPayment(input)),
+    status: publicProcedure
+      .input(z.object({ orderId: z.string().min(6).max(64) }))
+      .query(async ({ input }) => {
+        const order = await getPaymentOrderByOrderId(input.orderId);
+        return order ? { orderId: order.orderId, status: order.status, gameTitle: order.gameTitle, amount: order.amount } : null;
+      }),
   }),
   site: router({
     settings: publicProcedure.query(() => getSettings()),
@@ -195,6 +214,24 @@ export const appRouter = router({
     deleteGame: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(({ input }) => deleteGame(input.id)),
+    paymentOrders: adminProcedure.query(() => adminPaymentOrders()),
+    paymentStats: adminProcedure.query(() => import("./db").then(({ listPaymentStats }) => listPaymentStats())),
+    steamKeys: adminProcedure.query(async () => {
+      const { listSteamKeys } = await import("./db");
+      return (await listSteamKeys()).map(item => ({ ...item, steamKey: decryptPaymentData(item.encryptedKey) }));
+    }),
+    createSteamKey: adminProcedure
+      .input(z.object({ gameId: z.string(), steamKey: z.string().min(10).max(200) }))
+      .mutation(({ input }) => createSteamKey({ gameId: input.gameId, encryptedKey: encryptPaymentData(input.steamKey.trim()) })),
+    updateSteamKey: adminProcedure
+      .input(z.object({ id: z.string(), gameId: z.string().optional(), steamKey: z.string().min(10).max(200).optional(), status: z.enum(["AVAILABLE", "SOLD", "REVOKED"]).optional() }))
+      .mutation(({ input }) => {
+        const { id, steamKey, ...rest } = input;
+        return updateSteamKey(id, { ...rest, ...(steamKey ? { encryptedKey: encryptPaymentData(steamKey.trim()) } : {}) });
+      }),
+    deleteSteamKey: adminProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(({ input }) => deleteSteamKey(input.id)),
     createTeam: adminProcedure
       .input(
         z.object({

@@ -52,8 +52,38 @@ export type Game = {
   externalLabel?: string | null;
   isNew: boolean;
   previewUrl?: string | null;
+  priceKRW?: number | null;
+  isPurchasable: boolean;
   createdAt: Date;
   updatedAt: Date;
+};
+export type PaymentOrderStatus = "PENDING" | "PAID" | "FULFILLED" | "FAILED" | "CANCELED";
+export type PaymentOrder = {
+  id: string;
+  orderId: string;
+  gameId: string;
+  gameTitle: string;
+  amount: number;
+  status: PaymentOrderStatus;
+  paymentMethod?: string | null;
+  paymentKey?: string | null;
+  name?: string;
+  email?: string;
+  phone?: string;
+  steamKey?: string;
+  createdAt: Date;
+  paidAt?: Date | null;
+  fulfilledAt?: Date | null;
+};
+export type SteamKeyInventory = {
+  id: string;
+  gameId: string;
+  gameTitle?: string;
+  status: "AVAILABLE" | "SOLD" | "REVOKED";
+  orderId?: string | null;
+  steamKey?: string;
+  createdAt: Date;
+  soldAt?: Date | null;
 };
 export type TeamMember = {
   id: string;

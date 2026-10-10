@@ -15,6 +15,8 @@ import type {
   User,
   InsertUser,
   SocialLink,
+  PaymentOrder,
+  SteamKeyInventory,
 } from "../shared/types";
 import { ENV } from "./_core/env";
 import { signedPreviewUrl } from "./_core/previewAccess";
@@ -45,6 +47,11 @@ export async function getDb(): Promise<Db | null> {
           database.collection("games").createIndex({ createdAt: -1 }),
           database.collection("team").createIndex({ sortOrder: 1 }),
           database.collection("security_logs").createIndex({ createdAt: -1 }),
+          database.collection("payment_orders").createIndex({ orderId: 1 }, { unique: true }),
+          database.collection("payment_orders").createIndex({ createdAt: -1 }),
+          database.collection("payment_orders").createIndex({ customerEmailHash: 1 }),
+          database.collection("steam_keys").createIndex({ gameId: 1, status: 1 }),
+          database.collection("steam_keys").createIndex({ orderId: 1 }, { sparse: true }),
         ]);
         return database;
       } catch (error) {
@@ -131,6 +138,8 @@ const normalizeGame = (d: AnyDoc, protectPreview = false): Game => ({
   previewUrl: protectPreview
     ? signedPreviewUrl(d.previewUrl)
     : (d.previewUrl ?? null),
+  priceKRW: d.priceKRW == null ? null : Number(d.priceKRW),
+  isPurchasable: Boolean(d.isPurchasable && Number(d.priceKRW) > 0),
   createdAt: date(d.createdAt),
   updatedAt: date(d.updatedAt),
 });
@@ -475,4 +484,138 @@ export async function listSecurityLogs(limit = 100) {
     detail: d.detail ?? "",
     createdAt: date(d.createdAt),
   }));
+}
+
+function normalizePaymentOrder(d: AnyDoc) {
+  return {
+    id: id(d),
+    orderId: String(d.orderId),
+    gameId: String(d.gameId),
+    gameTitle: String(d.gameTitle ?? ""),
+    amount: Number(d.amount ?? 0),
+    status: d.status ?? "PENDING",
+    customerName: String(d.customerName ?? ""),
+    customerEmail: String(d.customerEmail ?? ""),
+    customerPhone: String(d.customerPhone ?? ""),
+    customerEmailHash: String(d.customerEmailHash ?? ""),
+    paymentKey: d.paymentKey ?? null,
+    paymentMethod: d.paymentMethod ?? null,
+    steamKey: d.steamKey ?? null,
+    failureCode: d.failureCode ?? null,
+    createdAt: date(d.createdAt),
+    paidAt: d.paidAt ? date(d.paidAt) : null,
+    fulfilledAt: d.fulfilledAt ? date(d.fulfilledAt) : null,
+  };
+}
+
+export async function getGameForPurchase(idValue: string) {
+  const c = await col("games");
+  if (!c) return null;
+  const d = await c.findOne({ _id: documentId(idValue) } as any);
+  if (!d) return null;
+  const game = normalizeGame(d);
+  return game;
+}
+
+export async function createPaymentOrder(input: {
+  orderId: string;
+  gameId: string;
+  gameTitle: string;
+  amount: number;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  customerEmailHash: string;
+}) {
+  const c = await col("payment_orders");
+  if (!c) return null;
+  const now = new Date();
+  const d = { ...input, status: "PENDING", createdAt: now, updatedAt: now };
+  const result = await c.insertOne(d);
+  return normalizePaymentOrder({ ...d, _id: result.insertedId });
+}
+
+export async function getPaymentOrderByOrderId(orderId: string) {
+  const c = await col("payment_orders");
+  const d = await c?.findOne({ orderId });
+  return d ? normalizePaymentOrder(d) : null;
+}
+
+export async function getPaymentOrder(idValue: string) {
+  const c = await col("payment_orders");
+  const d = await c?.findOne({ _id: documentId(idValue) } as any);
+  return d ? normalizePaymentOrder(d) : null;
+}
+
+export async function updatePaymentOrder(orderId: string, patch: Record<string, unknown>) {
+  const c = await col("payment_orders");
+  if (!c) return null;
+  const result = await c.findOneAndUpdate(
+    { orderId },
+    { $set: { ...patch, updatedAt: new Date() } },
+    { returnDocument: "after" }
+  );
+  return result ? normalizePaymentOrder(result) : null;
+}
+
+export async function allocateSteamKey(gameId: string, orderId: string) {
+  const c = await col("steam_keys");
+  if (!c) return null;
+  const result = await c.findOneAndUpdate(
+    { gameId, status: "AVAILABLE" },
+    { $set: { status: "SOLD", orderId, soldAt: new Date(), updatedAt: new Date() } },
+    { sort: { createdAt: 1 }, returnDocument: "after" }
+  );
+  return result ? { ...result, encryptedKey: String(result.encryptedKey) } : null;
+}
+
+export async function createSteamKey(input: { gameId: string; encryptedKey: string }) {
+  const c = await col("steam_keys");
+  if (!c) return null;
+  const now = new Date();
+  const d = { gameId: input.gameId, encryptedKey: input.encryptedKey, status: "AVAILABLE", createdAt: now, updatedAt: now };
+  const result = await c.insertOne(d);
+  return { id: String(result.insertedId), gameId: d.gameId, status: d.status, createdAt: now };
+}
+
+export async function listSteamKeys() {
+  const c = await col("steam_keys");
+  if (!c) return [];
+  const games = await col("games");
+  const gameDocs = games ? await games.find({}).project({ title: 1 }).toArray() : [];
+  const titles = new Map(gameDocs.map(g => [String(g._id), String(g.title ?? "")]));
+  return (await c.find({}).sort({ createdAt: -1 }).limit(1000).toArray()).map(d => ({
+    id: id(d), gameId: String(d.gameId), gameTitle: titles.get(String(d.gameId)) ?? "", status: d.status,
+    encryptedKey: String(d.encryptedKey), orderId: d.orderId ?? null, createdAt: date(d.createdAt), soldAt: d.soldAt ? date(d.soldAt) : null,
+  }));
+}
+
+export async function updateSteamKey(idValue: string, input: { gameId?: string; encryptedKey?: string; status?: "AVAILABLE" | "SOLD" | "REVOKED" }) {
+  const c = await col("steam_keys");
+  if (!c) return null;
+  const patch = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+  const result = await c.findOneAndUpdate({ _id: documentId(idValue) } as any, { $set: { ...patch, updatedAt: new Date() } }, { returnDocument: "after" });
+  return result ? { id: id(result), gameId: String(result.gameId), status: result.status, encryptedKey: String(result.encryptedKey) } : null;
+}
+
+export async function deleteSteamKey(idValue: string) {
+  const c = await col("steam_keys");
+  if (!c) return false;
+  return (await c.deleteOne({ _id: documentId(idValue), status: "AVAILABLE" } as any)).deletedCount > 0;
+}
+
+export async function listPaymentOrders() {
+  const c = await col("payment_orders");
+  if (!c) return [];
+  return (await c.find({}).sort({ createdAt: -1 }).limit(500).toArray()).map(normalizePaymentOrder);
+}
+
+export async function listPaymentStats() {
+  const c = await col("payment_orders");
+  if (!c) return { total: 0, paid: 0, fulfilled: 0, revenue: 0, pending: 0, daily: [] };
+  const [summary, daily] = await Promise.all([
+    c.aggregate([{ $group: { _id: null, total: { $sum: 1 }, paid: { $sum: { $cond: [{ $in: ["$status", ["PAID", "FULFILLED"]] }, 1, 0] } }, fulfilled: { $sum: { $cond: [{ $eq: ["$status", "FULFILLED"] }, 1, 0] } }, revenue: { $sum: { $cond: [{ $in: ["$status", ["PAID", "FULFILLED"]] }, "$amount", 0] } }, pending: { $sum: { $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0] } } } }]).toArray(),
+    c.aggregate([{ $match: { status: { $in: ["PAID", "FULFILLED"] } } }, { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, orders: { $sum: 1 }, revenue: { $sum: "$amount" } } }, { $sort: { _id: 1 } }, { $limit: 31 }]).toArray(),
+  ]);
+  return { ...(summary[0] ?? { total: 0, paid: 0, fulfilled: 0, revenue: 0, pending: 0 }), daily: daily.map(d => ({ date: d._id, orders: d.orders, revenue: d.revenue })) };
 }

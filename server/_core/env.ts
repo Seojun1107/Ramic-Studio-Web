@@ -15,4 +15,7 @@ export const ENV = {
   publicBaseUrl: process.env.PUBLIC_BASE_URL ?? "https://ramicstudio.com",
   newsletterTokenSecret:
     process.env.NEWSLETTER_TOKEN_SECRET ?? process.env.JWT_SECRET ?? "",
+  tossClientKey: process.env.TOSS_CLIENT_KEY ?? "",
+  tossSecretKey: process.env.TOSS_SECRET_KEY ?? "",
+  paymentEncryptionKey: process.env.PAYMENT_DATA_ENCRYPTION_KEY ?? "",
 };

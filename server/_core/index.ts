@@ -25,6 +25,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { hasPreviewAccess, previewCookieName } from "./previewAccess";
 import { writeSecurityLog } from "../db";
+import { handleTossWebhook } from "../payment";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -324,6 +325,15 @@ async function startServer() {
       }
     }
   );
+  app.post("/api/payments/toss/webhook", async (req, res) => {
+    try {
+      await handleTossWebhook(req.body);
+      res.status(200).json({ received: true });
+    } catch (error) {
+      console.error("[Toss webhook] failed:", error instanceof Error ? error.message : error);
+      res.status(500).json({ received: false });
+    }
+  });
   await bootstrapAdmin();
   // tRPC API
   app.use(

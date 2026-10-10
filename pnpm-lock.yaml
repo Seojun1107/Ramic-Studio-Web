@@ -106,6 +106,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.90.2
         version: 5.90.2(react@19.2.1)
+      '@tosspayments/payment-sdk':
+        specifier: ^1.9.3
+        version: 1.9.3
       '@trpc/client':
         specifier: ^11.6.0
         version: 11.6.0(@trpc/server@11.6.0(typescript@5.9.3))(typescript@5.9.3)
@@ -1980,6 +1983,15 @@ packages:
     peerDependencies:
       react: ^18 || ^19
 
+  '@tosspayments/payment-sdk@1.9.3':
+    resolution: {integrity: sha512-gt4RogU8oh6YuCnt4GIOAQbBL83ecozJ3qen3Kq8ZvmTZluhsnhWFY19ZNyH5Jh6KAhSYI09dqM8pSC6enSeMw==}
+
+  '@tosspayments/payment__types@1.69.0':
+    resolution: {integrity: sha512-EbU36vLEWfhRpX/g4V0DyRiUmTkNeeVDYjJamD9aJiLmRbLl9PVdXi5QOQTMYma2RGRgA8drHY4yDMsjvKFwCg==}
+
+  '@tosspayments/sdk-constants@0.2.2':
+    resolution: {integrity: sha512-qTIcD9JnVtN65/yiW5sPAlvK5fpQtDluv4IEyslubncbQLQKE+ePSnGZU1fLNPxcchv6QTnwmgj9Ndm6EN/Ymg==}
+
   '@trpc/client@11.6.0':
     resolution: {integrity: sha512-DyWbYk2hd50BaVrXWVkaUnaSwgAF5g/lfBkXtkF1Aqlk6BtSzGUo3owPkgqQO2I5LwWy1+ra9TsSfBBvIZpTwg==}
     peerDependencies:
@@ -3822,6 +3834,10 @@ packages:
 
   tw-animate-css@1.4.0:
     resolution: {integrity: sha512-7bziOlRqH0hJx80h/3mbicLW7o8qLsH5+RaLR2t+OHM3D0JlWGODQKQ4cxbK7WlvmUxpcj6Kgu6EKqjrGFe3QQ==}
+
+  type-fest@2.19.0:
+    resolution: {integrity: sha512-RAH822pAdBgcNMAfWnCBU3CFZcfZ/i1eZjwFU/dsLKumyuuP3niueg2UAukXYF0E2AAoc82ZSSf9J0WQBinzHA==}
+    engines: {node: '>=12.20'}
 
   type-is@1.6.18:
     resolution: {integrity: sha512-TkRKr9sUTxEH8MdfuCSP7VizJyzRNMjj2J2do2Jr3Kym598JVdEksuzPQCnlFPW4ky9Q+iA+ma9BGm06XQBy8g==}
@@ -6122,6 +6138,18 @@ snapshots:
       '@tanstack/query-core': 5.90.2
       react: 19.2.1
 
+  '@tosspayments/payment-sdk@1.9.3':
+    dependencies:
+      '@tosspayments/payment__types': 1.69.0
+
+  '@tosspayments/payment__types@1.69.0':
+    dependencies:
+      '@tosspayments/sdk-constants': 0.2.2
+
+  '@tosspayments/sdk-constants@0.2.2':
+    dependencies:
+      type-fest: 2.19.0
+
   '@trpc/client@11.6.0(@trpc/server@11.6.0(typescript@5.9.3))(typescript@5.9.3)':
     dependencies:
       '@trpc/server': 11.6.0(typescript@5.9.3)
@@ -8395,6 +8423,8 @@ snapshots:
       fsevents: 2.3.3
 
   tw-animate-css@1.4.0: {}
+
+  type-fest@2.19.0: {}
 
   type-is@1.6.18:
     dependencies:

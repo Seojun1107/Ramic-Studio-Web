@@ -75,6 +75,11 @@ function GameActions({ game }: { game: any }) {
           체험하기
         </a>
       )}
+      {game.isPurchasable && game.priceKRW > 0 && (
+        <Link className="game-action game-action-buy" href={`/buy/${game.id}`}>
+          구입하기 · ₩{new Intl.NumberFormat("ko-KR").format(game.priceKRW)}
+        </Link>
+      )}
     </div>
   );
 }
