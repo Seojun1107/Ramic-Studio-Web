@@ -98,7 +98,8 @@ export default function Home() {
       );
       setNewsletterEmail("");
     },
-    onError: error => setNewsletterMessage(error.message || "구독에 실패했습니다."),
+    onError: error =>
+      setNewsletterMessage(error.message || "구독에 실패했습니다."),
   });
   const footerSocials =
     siteSettings?.socialLinks ??
@@ -194,6 +195,9 @@ export default function Home() {
           </div>
           <div className="hero-copy">
             <Reveal>
+              <div className="hero-wordmark" aria-label="Ramic Studio">
+                RAMIC <span>/</span> STUDIO
+              </div>
               <p className="eyebrow">
                 <Sparkles size={14} /> 이야기에 신호를 더하다
               </p>
