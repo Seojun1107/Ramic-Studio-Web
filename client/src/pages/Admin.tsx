@@ -634,7 +634,20 @@ export default function Admin() {
   const removeTeam = trpc.admin.deleteTeam.useMutation({
     onSuccess: () => void utils.admin.team.invalidate(),
   });
-  const saveSettings = trpc.admin.saveSettings.useMutation();
+  const saveSettings = trpc.admin.saveSettings.useMutation({
+    onSuccess: () => {
+      void utils.site.settings.invalidate();
+      setNoticeFeedback({
+        tone: "success",
+        message: "사이트 설정이 저장되었습니다.",
+      });
+    },
+    onError: error =>
+      setNoticeFeedback({
+        tone: "error",
+        message: `사이트 설정 저장 실패: ${error.message}`,
+      }),
+  });
   const addAdmin = trpc.admin.addAdmin.useMutation({
     onSuccess: () => setAdminForm({ username: "", password: "", name: "" }),
   });
@@ -2078,7 +2091,7 @@ export default function Admin() {
                   <label>
                     사업자 이메일
                     <input
-                      type="email"
+                      type="text"
                       value={socials.businessInfo.email}
                       onChange={e =>
                         setSocials({
@@ -2089,6 +2102,7 @@ export default function Admin() {
                           },
                         })
                       }
+                      placeholder="예: contact@ramicstudio.com"
                     />
                   </label>
                   <label>
@@ -2149,6 +2163,14 @@ export default function Admin() {
                     }
                   />
                 </label>
+                {saveSettings.error && (
+                  <p className="form-error">
+                    사이트 설정 저장 실패: {saveSettings.error.message}
+                  </p>
+                )}
+                {saveSettings.isSuccess && (
+                  <p className="form-success">사이트 설정이 저장되었습니다.</p>
+                )}
                 <button className="publish-button">
                   <Link2 size={16} /> 설정 저장
                 </button>
