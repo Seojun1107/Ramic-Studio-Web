@@ -57,7 +57,12 @@ export type Game = {
   createdAt: Date;
   updatedAt: Date;
 };
-export type PaymentOrderStatus = "PENDING" | "PAID" | "FULFILLED" | "FAILED" | "CANCELED";
+export type PaymentOrderStatus =
+  | "PENDING"
+  | "PAID"
+  | "FULFILLED"
+  | "FAILED"
+  | "CANCELED";
 export type PaymentOrder = {
   id: string;
   orderId: string;
@@ -97,6 +102,16 @@ export type TeamMember = {
   updatedAt: Date;
 };
 export type SocialLink = { label: string; url: string };
+export type BusinessInfo = {
+  businessName: string;
+  representative: string;
+  businessNumber: string;
+  ecommerceRegistration: string;
+  address: string;
+  phone: string;
+  email: string;
+  verificationUrl: string;
+};
 export type SiteSettings = {
   id: string;
   logoUrl: string;
@@ -106,6 +121,11 @@ export type SiteSettings = {
   steamUrl?: string;
   socialLinks?: SocialLink[];
   footerText?: string;
+  businessInfo: BusinessInfo;
+  termsTitle: string;
+  termsBody: string;
+  privacyTitle: string;
+  privacyBody: string;
   updatedAt: Date;
 };
 export type InsertNotice = Pick<Notice, "category" | "title" | "body"> & {

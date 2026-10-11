@@ -403,6 +403,20 @@ export default function Admin() {
     steamUrl: "",
     socialLinks: [] as Array<{ label: string; url: string }>,
     footerText: "",
+    businessInfo: {
+      businessName: "라믹 스튜디오",
+      representative: "",
+      businessNumber: "522-28-01731",
+      ecommerceRegistration: "",
+      address: "",
+      phone: "",
+      email: "",
+      verificationUrl: "https://www.hometax.go.kr/",
+    },
+    termsTitle: "이용약관",
+    termsBody: "",
+    privacyTitle: "개인정보처리방침",
+    privacyBody: "",
   });
   const [adminForm, setAdminForm] = useState({
     username: "",
@@ -457,6 +471,11 @@ export default function Admin() {
             .filter(([, url]) => url)
             .map(([label, url]) => ({ label, url })),
         footerText: settings.data.footerText ?? "",
+        businessInfo: settings.data.businessInfo,
+        termsTitle: settings.data.termsTitle,
+        termsBody: settings.data.termsBody,
+        privacyTitle: settings.data.privacyTitle,
+        privacyBody: settings.data.privacyBody,
       });
   }, [settings.data]);
   useEffect(() => {
@@ -1954,6 +1973,179 @@ export default function Admin() {
                     value={socials.footerText}
                     onChange={e =>
                       setSocials({ ...socials, footerText: e.target.value })
+                    }
+                  />
+                </label>
+                <div className="editor-divider">
+                  <span>BUSINESS / 사업자 정보</span>
+                </div>
+                <p className="editor-intro">
+                  사업자등록번호는 <strong>522-28-01731</strong>로 입력해
+                  두었습니다. 대표자·주소·연락처·통신판매업 신고번호는 실제
+                  정보로 확인 후 저장해 주세요.
+                </p>
+                <div className="editor-grid">
+                  <label>
+                    사업자명
+                    <input
+                      value={socials.businessInfo.businessName}
+                      onChange={e =>
+                        setSocials({
+                          ...socials,
+                          businessInfo: {
+                            ...socials.businessInfo,
+                            businessName: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    대표자
+                    <input
+                      value={socials.businessInfo.representative}
+                      onChange={e =>
+                        setSocials({
+                          ...socials,
+                          businessInfo: {
+                            ...socials.businessInfo,
+                            representative: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    사업자등록번호
+                    <input
+                      value={socials.businessInfo.businessNumber}
+                      onChange={e =>
+                        setSocials({
+                          ...socials,
+                          businessInfo: {
+                            ...socials.businessInfo,
+                            businessNumber: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    통신판매업 신고번호
+                    <input
+                      value={socials.businessInfo.ecommerceRegistration}
+                      onChange={e =>
+                        setSocials({
+                          ...socials,
+                          businessInfo: {
+                            ...socials.businessInfo,
+                            ecommerceRegistration: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    사업장 주소
+                    <input
+                      value={socials.businessInfo.address}
+                      onChange={e =>
+                        setSocials({
+                          ...socials,
+                          businessInfo: {
+                            ...socials.businessInfo,
+                            address: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    사업자 연락처
+                    <input
+                      value={socials.businessInfo.phone}
+                      onChange={e =>
+                        setSocials({
+                          ...socials,
+                          businessInfo: {
+                            ...socials.businessInfo,
+                            phone: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    사업자 이메일
+                    <input
+                      type="email"
+                      value={socials.businessInfo.email}
+                      onChange={e =>
+                        setSocials({
+                          ...socials,
+                          businessInfo: {
+                            ...socials.businessInfo,
+                            email: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    사업자정보 확인 링크
+                    <input
+                      type="url"
+                      value={socials.businessInfo.verificationUrl}
+                      onChange={e =>
+                        setSocials({
+                          ...socials,
+                          businessInfo: {
+                            ...socials.businessInfo,
+                            verificationUrl: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="editor-divider">
+                  <span>LEGAL / 법적 문서</span>
+                </div>
+                <label>
+                  이용약관 제목
+                  <input
+                    value={socials.termsTitle}
+                    onChange={e =>
+                      setSocials({ ...socials, termsTitle: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  이용약관 본문
+                  <textarea
+                    rows={18}
+                    value={socials.termsBody}
+                    onChange={e =>
+                      setSocials({ ...socials, termsBody: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  개인정보처리방침 제목
+                  <input
+                    value={socials.privacyTitle}
+                    onChange={e =>
+                      setSocials({ ...socials, privacyTitle: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  개인정보처리방침 본문
+                  <textarea
+                    rows={22}
+                    value={socials.privacyBody}
+                    onChange={e =>
+                      setSocials({ ...socials, privacyBody: e.target.value })
                     }
                   />
                 </label>

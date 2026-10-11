@@ -31,8 +31,18 @@ import {
 } from "./db";
 import { hash } from "bcryptjs";
 import { publishDiscordNotice } from "./_core/discord";
-import { sendNoticeNewsletter, subscribeToNewsletter } from "./_core/newsletter";
-import { adminPaymentOrders, confirmPayment, createSteamKey, deleteSteamKey, startPayment, updateSteamKey } from "./payment";
+import {
+  sendNoticeNewsletter,
+  subscribeToNewsletter,
+} from "./_core/newsletter";
+import {
+  adminPaymentOrders,
+  confirmPayment,
+  createSteamKey,
+  deleteSteamKey,
+  startPayment,
+  updateSteamKey,
+} from "./payment";
 import { encryptPaymentData, decryptPaymentData } from "./_core/paymentCrypto";
 const gameInput = z.object({
   code: z.string().min(1).max(20),
@@ -87,16 +97,36 @@ export const appRouter = router({
   }),
   payments: router({
     start: publicProcedure
-      .input(z.object({ gameId: z.string(), name: z.string().min(2).max(100), email: z.string().email().max(254), phone: z.string().min(10).max(20) }))
+      .input(
+        z.object({
+          gameId: z.string(),
+          name: z.string().min(2).max(100),
+          email: z.string().email().max(254),
+          phone: z.string().min(10).max(20),
+        })
+      )
       .mutation(({ input }) => startPayment(input)),
     confirm: publicProcedure
-      .input(z.object({ paymentKey: z.string().min(1).max(200), orderId: z.string().min(6).max(64), amount: z.number().int().positive() }))
+      .input(
+        z.object({
+          paymentKey: z.string().min(1).max(200),
+          orderId: z.string().min(6).max(64),
+          amount: z.number().int().positive(),
+        })
+      )
       .mutation(({ input }) => confirmPayment(input)),
     status: publicProcedure
       .input(z.object({ orderId: z.string().min(6).max(64) }))
       .query(async ({ input }) => {
         const order = await getPaymentOrderByOrderId(input.orderId);
-        return order ? { orderId: order.orderId, status: order.status, gameTitle: order.gameTitle, amount: order.amount } : null;
+        return order
+          ? {
+              orderId: order.orderId,
+              status: order.status,
+              gameTitle: order.gameTitle,
+              amount: order.amount,
+            }
+          : null;
       }),
   }),
   site: router({
@@ -128,7 +158,12 @@ export const appRouter = router({
       if (!created)
         return {
           notice: null,
-          newsletter: { sent: false, skipped: true, total: 0, message: "공지 저장에 실패해 이메일을 보내지 않았습니다." },
+          newsletter: {
+            sent: false,
+            skipped: true,
+            total: 0,
+            message: "공지 저장에 실패해 이메일을 보내지 않았습니다.",
+          },
           discord: { sent: false, message: "공지 저장에 실패했습니다." },
         };
       const newsletter = newsletterNotify
@@ -184,7 +219,17 @@ export const appRouter = router({
               skipped: true as const,
               message: "Discord 전송을 건너뛰었습니다.",
             };
-        return { notice: updated, newsletter: { sent: 0, failed: 0, skipped: true, total: 0, message: "수정된 공지는 이메일을 다시 보내지 않습니다." }, discord };
+        return {
+          notice: updated,
+          newsletter: {
+            sent: 0,
+            failed: 0,
+            skipped: true,
+            total: 0,
+            message: "수정된 공지는 이메일을 다시 보내지 않습니다.",
+          },
+          discord,
+        };
       }),
     remove: adminProcedure
       .input(z.object({ id: z.string() }))
@@ -196,12 +241,18 @@ export const appRouter = router({
     games: adminProcedure.query(() => listGames()),
     team: adminProcedure.query(() => listAllTeam()),
     faqs: adminProcedure.query(() => listFaqs()),
-    createFaq: adminProcedure.input(faqInput).mutation(({ input }) => createFaq(input)),
-    updateFaq: adminProcedure.input(faqInput.extend({ id: z.string() })).mutation(({ input }) => {
-      const { id, ...faq } = input;
-      return updateFaq(id, faq);
-    }),
-    deleteFaq: adminProcedure.input(z.object({ id: z.string() })).mutation(({ input }) => deleteFaq(input.id)),
+    createFaq: adminProcedure
+      .input(faqInput)
+      .mutation(({ input }) => createFaq(input)),
+    updateFaq: adminProcedure
+      .input(faqInput.extend({ id: z.string() }))
+      .mutation(({ input }) => {
+        const { id, ...faq } = input;
+        return updateFaq(id, faq);
+      }),
+    deleteFaq: adminProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(({ input }) => deleteFaq(input.id)),
     createGame: adminProcedure
       .input(gameInput)
       .mutation(({ input }) => createGame(input)),
@@ -215,19 +266,43 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .mutation(({ input }) => deleteGame(input.id)),
     paymentOrders: adminProcedure.query(() => adminPaymentOrders()),
-    paymentStats: adminProcedure.query(() => import("./db").then(({ listPaymentStats }) => listPaymentStats())),
+    paymentStats: adminProcedure.query(() =>
+      import("./db").then(({ listPaymentStats }) => listPaymentStats())
+    ),
     steamKeys: adminProcedure.query(async () => {
       const { listSteamKeys } = await import("./db");
-      return (await listSteamKeys()).map(item => ({ ...item, steamKey: decryptPaymentData(item.encryptedKey) }));
+      return (await listSteamKeys()).map(item => ({
+        ...item,
+        steamKey: decryptPaymentData(item.encryptedKey),
+      }));
     }),
     createSteamKey: adminProcedure
-      .input(z.object({ gameId: z.string(), steamKey: z.string().min(10).max(200) }))
-      .mutation(({ input }) => createSteamKey({ gameId: input.gameId, encryptedKey: encryptPaymentData(input.steamKey.trim()) })),
+      .input(
+        z.object({ gameId: z.string(), steamKey: z.string().min(10).max(200) })
+      )
+      .mutation(({ input }) =>
+        createSteamKey({
+          gameId: input.gameId,
+          encryptedKey: encryptPaymentData(input.steamKey.trim()),
+        })
+      ),
     updateSteamKey: adminProcedure
-      .input(z.object({ id: z.string(), gameId: z.string().optional(), steamKey: z.string().min(10).max(200).optional(), status: z.enum(["AVAILABLE", "SOLD", "REVOKED"]).optional() }))
+      .input(
+        z.object({
+          id: z.string(),
+          gameId: z.string().optional(),
+          steamKey: z.string().min(10).max(200).optional(),
+          status: z.enum(["AVAILABLE", "SOLD", "REVOKED"]).optional(),
+        })
+      )
       .mutation(({ input }) => {
         const { id, steamKey, ...rest } = input;
-        return updateSteamKey(id, { ...rest, ...(steamKey ? { encryptedKey: encryptPaymentData(steamKey.trim()) } : {}) });
+        return updateSteamKey(id, {
+          ...rest,
+          ...(steamKey
+            ? { encryptedKey: encryptPaymentData(steamKey.trim()) }
+            : {}),
+        });
       }),
     deleteSteamKey: adminProcedure
       .input(z.object({ id: z.string() }))
@@ -281,6 +356,22 @@ export const appRouter = router({
             .max(20)
             .optional(),
           footerText: z.string().max(500).optional(),
+          businessInfo: z
+            .object({
+              businessName: z.string().max(120),
+              representative: z.string().max(80),
+              businessNumber: z.string().max(40),
+              ecommerceRegistration: z.string().max(120),
+              address: z.string().max(300),
+              phone: z.string().max(40),
+              email: z.string().max(254),
+              verificationUrl: z.string().url().max(2000),
+            })
+            .optional(),
+          termsTitle: z.string().max(120).optional(),
+          termsBody: z.string().max(100000).optional(),
+          privacyTitle: z.string().max(120).optional(),
+          privacyBody: z.string().max(100000).optional(),
         })
       )
       .mutation(({ input }) => saveSettings(input)),

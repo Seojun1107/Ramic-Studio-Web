@@ -15,11 +15,72 @@ import type {
   User,
   InsertUser,
   SocialLink,
+  BusinessInfo,
   PaymentOrder,
   SteamKeyInventory,
 } from "../shared/types";
 import { ENV } from "./_core/env";
 import { signedPreviewUrl } from "./_core/previewAccess";
+const defaultBusinessInfo: BusinessInfo = {
+  businessName: "라믹 스튜디오",
+  representative: "대표자명 입력 필요",
+  businessNumber: "522-28-01731",
+  ecommerceRegistration: "통신판매업 신고번호 입력 필요",
+  address: "사업장 주소 입력 필요",
+  phone: "전화번호 입력 필요",
+  email: "이메일 입력 필요",
+  verificationUrl: "https://www.hometax.go.kr/",
+};
+const defaultTermsBody = `제1조 (목적)
+이 약관은 라믹 스튜디오(이하 "회사")가 제공하는 웹사이트, 게임, 디지털 콘텐츠 및 관련 서비스의 이용 조건과 절차를 규정합니다.
+
+제2조 (서비스의 내용)
+회사는 게임 콘텐츠, 웹 체험판, 공지사항, 문의 및 디지털 상품 판매 서비스를 제공합니다. 서비스의 내용과 운영 시간은 회사의 사정에 따라 변경될 수 있으며, 중요한 변경은 사이트를 통해 안내합니다.
+
+제3조 (회원 및 이용자의 의무)
+이용자는 관계 법령, 본 약관, 개인정보처리방침 및 서비스 안내를 준수해야 합니다. 타인의 정보를 도용하거나 서비스 운영을 방해하는 행위, 구매한 콘텐츠의 키를 무단으로 재판매·공유하는 행위는 금지됩니다.
+
+제4조 (디지털 상품의 구매와 제공)
+결제가 완료되고 승인되면 디지털 상품 또는 게임 키를 구매 시 입력한 이메일로 제공합니다. 이메일 주소 오기입, 스팸 차단 등 이용자의 사유로 수신하지 못한 경우 이용자가 고객센터로 문의해야 합니다.
+
+제5조 (결제·취소·환불)
+결제는 토스페이먼츠를 통해 처리됩니다. 환불 및 청약철회 가능 여부는 디지털 상품의 제공·사용 여부와 관계 법령 및 별도 환불정책에 따라 판단합니다. 환불 문의는 문의하기 채널로 접수해 주세요.
+
+제6조 (서비스 이용 제한)
+회사는 보안, 운영, 법령 준수를 위해 필요한 경우 사전 통지 후 또는 긴급한 경우 사후 통지로 서비스 이용을 제한할 수 있습니다.
+
+제7조 (면책)
+회사는 천재지변, 통신 장애 또는 회사가 합리적으로 통제하기 어려운 사유로 발생한 서비스 중단에 대해 고의 또는 중대한 과실이 없는 한 책임을 부담하지 않습니다.
+
+제8조 (준거법 및 관할)
+본 약관은 대한민국 법령에 따라 해석되며, 회사와 이용자 사이에 분쟁이 발생하면 관련 법령이 정하는 절차에 따릅니다.
+
+시행일: 2026년 10월 11일
+※ 사업자명, 대표자, 환불정책 및 실제 운영 정보는 관리자 설정에서 사업 개시 전에 확정해 주세요.`;
+const defaultPrivacyBody = `라믹 스튜디오(이하 "회사")는 개인정보 보호법 등 관련 법령을 준수합니다. 본 개인정보처리방침은 회사가 운영하는 웹사이트와 게임 구매 서비스에 적용됩니다.
+
+1. 수집하는 개인정보
+게임 구매 시 이름, 이메일 주소, 전화번호를 필수로 수집합니다. 문의·뉴스레터 이용 시 이용자가 입력한 이메일 또는 문의 내용을 수집할 수 있습니다. 결제 과정은 토스페이먼츠가 처리하며, 회사는 결제 승인에 필요한 주문번호·결제키·결제금액·결제수단 상태를 보관합니다.
+
+2. 이용 목적
+수집한 정보는 주문 확인, 결제 승인, 디지털 상품 및 스팀키 발송, 문의 응대, 환불·분쟁 처리, 부정 이용 방지와 서비스 운영을 위해 사용합니다.
+
+3. 보유 및 이용 기간
+구매·결제 기록은 전자상거래 관련 법령이 정하는 기간 동안 보관합니다. 그 외 개인정보는 이용 목적이 달성되거나 이용자의 삭제 요청이 처리되면 지체 없이 파기합니다. 법령에 따라 보관이 필요한 경우 해당 기간 동안 안전하게 분리 보관합니다.
+
+4. 처리 및 보호 조치
+이름·이메일·전화번호와 스팀키는 서버에서 암호화하여 저장하고, 관리자 인증을 거친 운영자만 필요한 범위에서 조회할 수 있습니다. 전송 구간은 HTTPS 사용을 원칙으로 하며, 접근 기록과 권한을 관리합니다.
+
+5. 제3자 제공 및 처리위탁
+결제 처리를 위해 토스페이먼츠에 결제 관련 정보가 전달될 수 있으며, 이메일 발송을 위해 회사가 사용하는 이메일 발송 서비스에 수신자 이메일과 발송 내용이 전달될 수 있습니다. 각 서비스의 개인정보 처리방침과 국외 이전 여부는 실제 계약·설정에 따라 최신 정보로 갱신합니다.
+
+6. 이용자의 권리
+이용자는 개인정보 열람, 정정, 삭제, 처리정지 등을 요청할 수 있습니다. 요청은 문의하기 채널 또는 관리자 설정에 등록된 이메일로 접수하며, 본인 확인 후 관련 법령에 따라 처리합니다.
+
+7. 개인정보 보호책임자
+사업자명, 대표자, 개인정보 보호책임자 이름·연락처는 관리자 설정에서 실제 운영 정보로 입력해야 합니다. 현재 공개된 사업자 정보와 연락처가 비어 있으면 서비스 운영 전에 반드시 보완해 주세요.
+
+시행일: 2026년 10월 11일`;
 type AnyDoc = Document & Record<string, any>;
 let client: MongoClient | null = null;
 let database: Db | null = null;
@@ -43,15 +104,25 @@ export async function getDb(): Promise<Db | null> {
             .collection("users")
             .createIndex({ username: 1 }, { unique: true, sparse: true }),
           database.collection("notices").createIndex({ publishedAt: -1 }),
-          database.collection("faqs").createIndex({ sortOrder: 1, createdAt: -1 }),
+          database
+            .collection("faqs")
+            .createIndex({ sortOrder: 1, createdAt: -1 }),
           database.collection("games").createIndex({ createdAt: -1 }),
           database.collection("team").createIndex({ sortOrder: 1 }),
           database.collection("security_logs").createIndex({ createdAt: -1 }),
-          database.collection("payment_orders").createIndex({ orderId: 1 }, { unique: true }),
+          database
+            .collection("payment_orders")
+            .createIndex({ orderId: 1 }, { unique: true }),
           database.collection("payment_orders").createIndex({ createdAt: -1 }),
-          database.collection("payment_orders").createIndex({ customerEmailHash: 1 }),
-          database.collection("steam_keys").createIndex({ gameId: 1, status: 1 }),
-          database.collection("steam_keys").createIndex({ orderId: 1 }, { sparse: true }),
+          database
+            .collection("payment_orders")
+            .createIndex({ customerEmailHash: 1 }),
+          database
+            .collection("steam_keys")
+            .createIndex({ gameId: 1, status: 1 }),
+          database
+            .collection("steam_keys")
+            .createIndex({ orderId: 1 }, { sparse: true }),
         ]);
         return database;
       } catch (error) {
@@ -257,22 +328,46 @@ export async function listFaqs(publicOnly = false) {
   const c = await col("faqs");
   if (!c) return [];
   const filter = publicOnly ? { isPublished: { $ne: false } } : {};
-  return (await c.find(filter).sort({ sortOrder: 1, createdAt: -1 }).limit(200).toArray()).map(normalizeFaq);
+  return (
+    await c
+      .find(filter)
+      .sort({ sortOrder: 1, createdAt: -1 })
+      .limit(200)
+      .toArray()
+  ).map(normalizeFaq);
 }
-export async function createFaq(input: Omit<Faq, "id" | "createdAt" | "updatedAt">) {
+export async function createFaq(
+  input: Omit<Faq, "id" | "createdAt" | "updatedAt">
+) {
   const c = await col("faqs");
   if (!c) return null;
   const now = new Date();
-  const d = { ...input, question: input.question.trim(), answer: input.answer.trim(), createdAt: now, updatedAt: now };
+  const d = {
+    ...input,
+    question: input.question.trim(),
+    answer: input.answer.trim(),
+    createdAt: now,
+    updatedAt: now,
+  };
   const r = await c.insertOne(d);
   return normalizeFaq({ ...d, _id: r.insertedId });
 }
-export async function updateFaq(idValue: string, input: Omit<Faq, "id" | "createdAt" | "updatedAt">) {
+export async function updateFaq(
+  idValue: string,
+  input: Omit<Faq, "id" | "createdAt" | "updatedAt">
+) {
   const c = await col("faqs");
   if (!c) return null;
   const result = await c.findOneAndUpdate(
     { _id: documentId(idValue) } as any,
-    { $set: { ...input, question: input.question.trim(), answer: input.answer.trim(), updatedAt: new Date() } },
+    {
+      $set: {
+        ...input,
+        question: input.question.trim(),
+        answer: input.answer.trim(),
+        updatedAt: new Date(),
+      },
+    },
     { returnDocument: "after" }
   );
   return result ? normalizeFaq(result) : null;
@@ -280,7 +375,9 @@ export async function updateFaq(idValue: string, input: Omit<Faq, "id" | "create
 export async function deleteFaq(idValue: string) {
   const c = await col("faqs");
   if (!c) return false;
-  return (await c.deleteOne({ _id: documentId(idValue) } as any)).deletedCount > 0;
+  return (
+    (await c.deleteOne({ _id: documentId(idValue) } as any)).deletedCount > 0
+  );
 }
 export async function listGames(protectPreview = false) {
   const c = await col("games");
@@ -401,6 +498,11 @@ export async function getSettings(): Promise<SiteSettings> {
           .filter((link: SocialLink) => link.label && link.url)
       : legacySocialLinks(d),
     footerText: d?.footerText ?? "© 2026 RAMIC STUDIO. 호기심으로 만듭니다.",
+    businessInfo: { ...defaultBusinessInfo, ...(d?.businessInfo ?? {}) },
+    termsTitle: d?.termsTitle ?? "이용약관",
+    termsBody: d?.termsBody ?? defaultTermsBody,
+    privacyTitle: d?.privacyTitle ?? "개인정보처리방침",
+    privacyBody: d?.privacyBody ?? defaultPrivacyBody,
     updatedAt: date(d?.updatedAt ?? new Date()),
   };
 }
@@ -547,7 +649,10 @@ export async function getPaymentOrder(idValue: string) {
   return d ? normalizePaymentOrder(d) : null;
 }
 
-export async function updatePaymentOrder(orderId: string, patch: Record<string, unknown>) {
+export async function updatePaymentOrder(
+  orderId: string,
+  patch: Record<string, unknown>
+) {
   const c = await col("payment_orders");
   if (!c) return null;
   const result = await c.findOneAndUpdate(
@@ -563,59 +668,186 @@ export async function allocateSteamKey(gameId: string, orderId: string) {
   if (!c) return null;
   const result = await c.findOneAndUpdate(
     { gameId, status: "AVAILABLE" },
-    { $set: { status: "SOLD", orderId, soldAt: new Date(), updatedAt: new Date() } },
+    {
+      $set: {
+        status: "SOLD",
+        orderId,
+        soldAt: new Date(),
+        updatedAt: new Date(),
+      },
+    },
     { sort: { createdAt: 1 }, returnDocument: "after" }
   );
-  return result ? { ...result, encryptedKey: String(result.encryptedKey) } : null;
+  return result
+    ? { ...result, encryptedKey: String(result.encryptedKey) }
+    : null;
 }
 
-export async function createSteamKey(input: { gameId: string; encryptedKey: string }) {
+export async function createSteamKey(input: {
+  gameId: string;
+  encryptedKey: string;
+}) {
   const c = await col("steam_keys");
   if (!c) return null;
   const now = new Date();
-  const d = { gameId: input.gameId, encryptedKey: input.encryptedKey, status: "AVAILABLE", createdAt: now, updatedAt: now };
+  const d = {
+    gameId: input.gameId,
+    encryptedKey: input.encryptedKey,
+    status: "AVAILABLE",
+    createdAt: now,
+    updatedAt: now,
+  };
   const result = await c.insertOne(d);
-  return { id: String(result.insertedId), gameId: d.gameId, status: d.status, createdAt: now };
+  return {
+    id: String(result.insertedId),
+    gameId: d.gameId,
+    status: d.status,
+    createdAt: now,
+  };
 }
 
 export async function listSteamKeys() {
   const c = await col("steam_keys");
   if (!c) return [];
   const games = await col("games");
-  const gameDocs = games ? await games.find({}).project({ title: 1 }).toArray() : [];
-  const titles = new Map(gameDocs.map(g => [String(g._id), String(g.title ?? "")]));
-  return (await c.find({}).sort({ createdAt: -1 }).limit(1000).toArray()).map(d => ({
-    id: id(d), gameId: String(d.gameId), gameTitle: titles.get(String(d.gameId)) ?? "", status: d.status,
-    encryptedKey: String(d.encryptedKey), orderId: d.orderId ?? null, createdAt: date(d.createdAt), soldAt: d.soldAt ? date(d.soldAt) : null,
-  }));
+  const gameDocs = games
+    ? await games.find({}).project({ title: 1 }).toArray()
+    : [];
+  const titles = new Map(
+    gameDocs.map(g => [String(g._id), String(g.title ?? "")])
+  );
+  return (await c.find({}).sort({ createdAt: -1 }).limit(1000).toArray()).map(
+    d => ({
+      id: id(d),
+      gameId: String(d.gameId),
+      gameTitle: titles.get(String(d.gameId)) ?? "",
+      status: d.status,
+      encryptedKey: String(d.encryptedKey),
+      orderId: d.orderId ?? null,
+      createdAt: date(d.createdAt),
+      soldAt: d.soldAt ? date(d.soldAt) : null,
+    })
+  );
 }
 
-export async function updateSteamKey(idValue: string, input: { gameId?: string; encryptedKey?: string; status?: "AVAILABLE" | "SOLD" | "REVOKED" }) {
+export async function updateSteamKey(
+  idValue: string,
+  input: {
+    gameId?: string;
+    encryptedKey?: string;
+    status?: "AVAILABLE" | "SOLD" | "REVOKED";
+  }
+) {
   const c = await col("steam_keys");
   if (!c) return null;
-  const patch = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
-  const result = await c.findOneAndUpdate({ _id: documentId(idValue) } as any, { $set: { ...patch, updatedAt: new Date() } }, { returnDocument: "after" });
-  return result ? { id: id(result), gameId: String(result.gameId), status: result.status, encryptedKey: String(result.encryptedKey) } : null;
+  const patch = Object.fromEntries(
+    Object.entries(input).filter(([, value]) => value !== undefined)
+  );
+  const result = await c.findOneAndUpdate(
+    { _id: documentId(idValue) } as any,
+    { $set: { ...patch, updatedAt: new Date() } },
+    { returnDocument: "after" }
+  );
+  return result
+    ? {
+        id: id(result),
+        gameId: String(result.gameId),
+        status: result.status,
+        encryptedKey: String(result.encryptedKey),
+      }
+    : null;
 }
 
 export async function deleteSteamKey(idValue: string) {
   const c = await col("steam_keys");
   if (!c) return false;
-  return (await c.deleteOne({ _id: documentId(idValue), status: "AVAILABLE" } as any)).deletedCount > 0;
+  return (
+    (
+      await c.deleteOne({
+        _id: documentId(idValue),
+        status: "AVAILABLE",
+      } as any)
+    ).deletedCount > 0
+  );
 }
 
 export async function listPaymentOrders() {
   const c = await col("payment_orders");
   if (!c) return [];
-  return (await c.find({}).sort({ createdAt: -1 }).limit(500).toArray()).map(normalizePaymentOrder);
+  return (await c.find({}).sort({ createdAt: -1 }).limit(500).toArray()).map(
+    normalizePaymentOrder
+  );
 }
 
 export async function listPaymentStats() {
   const c = await col("payment_orders");
-  if (!c) return { total: 0, paid: 0, fulfilled: 0, revenue: 0, pending: 0, daily: [] };
+  if (!c)
+    return {
+      total: 0,
+      paid: 0,
+      fulfilled: 0,
+      revenue: 0,
+      pending: 0,
+      daily: [],
+    };
   const [summary, daily] = await Promise.all([
-    c.aggregate([{ $group: { _id: null, total: { $sum: 1 }, paid: { $sum: { $cond: [{ $in: ["$status", ["PAID", "FULFILLED"]] }, 1, 0] } }, fulfilled: { $sum: { $cond: [{ $eq: ["$status", "FULFILLED"] }, 1, 0] } }, revenue: { $sum: { $cond: [{ $in: ["$status", ["PAID", "FULFILLED"]] }, "$amount", 0] } }, pending: { $sum: { $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0] } } } }]).toArray(),
-    c.aggregate([{ $match: { status: { $in: ["PAID", "FULFILLED"] } } }, { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, orders: { $sum: 1 }, revenue: { $sum: "$amount" } } }, { $sort: { _id: 1 } }, { $limit: 31 }]).toArray(),
+    c
+      .aggregate([
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            paid: {
+              $sum: {
+                $cond: [{ $in: ["$status", ["PAID", "FULFILLED"]] }, 1, 0],
+              },
+            },
+            fulfilled: {
+              $sum: { $cond: [{ $eq: ["$status", "FULFILLED"] }, 1, 0] },
+            },
+            revenue: {
+              $sum: {
+                $cond: [
+                  { $in: ["$status", ["PAID", "FULFILLED"]] },
+                  "$amount",
+                  0,
+                ],
+              },
+            },
+            pending: {
+              $sum: { $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0] },
+            },
+          },
+        },
+      ])
+      .toArray(),
+    c
+      .aggregate([
+        { $match: { status: { $in: ["PAID", "FULFILLED"] } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            orders: { $sum: 1 },
+            revenue: { $sum: "$amount" },
+          },
+        },
+        { $sort: { _id: 1 } },
+        { $limit: 31 },
+      ])
+      .toArray(),
   ]);
-  return { ...(summary[0] ?? { total: 0, paid: 0, fulfilled: 0, revenue: 0, pending: 0 }), daily: daily.map(d => ({ date: d._id, orders: d.orders, revenue: d.revenue })) };
+  return {
+    ...(summary[0] ?? {
+      total: 0,
+      paid: 0,
+      fulfilled: 0,
+      revenue: 0,
+      pending: 0,
+    }),
+    daily: daily.map(d => ({
+      date: d._id,
+      orders: d.orders,
+      revenue: d.revenue,
+    })),
+  };
 }

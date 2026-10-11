@@ -499,6 +499,33 @@ export default function Home() {
           {siteSettings?.footerText ||
             "© 2026 RAMIC STUDIO. 호기심으로 만듭니다."}
         </span>
+        <div className="footer-business">
+          <span>
+            {siteSettings?.businessInfo?.businessName || "라믹 스튜디오"}
+          </span>
+          <span>
+            대표{" "}
+            {siteSettings?.businessInfo?.representative || "정보 입력 필요"}
+          </span>
+          <span>
+            사업자등록번호{" "}
+            {siteSettings?.businessInfo?.businessNumber || "522-28-01731"}
+          </span>
+          <a
+            href={
+              siteSettings?.businessInfo?.verificationUrl ||
+              "https://www.hometax.go.kr/"
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            사업자정보 보기 <ExternalLink size={11} />
+          </a>
+        </div>
+        <div className="footer-legal-links">
+          <Link href="/terms">이용약관</Link>
+          <Link href="/privacy">개인정보처리방침</Link>
+        </div>
         <div className="footer-links">
           {footerSocials.map(link => (
             <a
